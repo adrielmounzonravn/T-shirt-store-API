@@ -75,7 +75,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
       mapping
 - [x] helmet, CORS, global rate limit
 - [x] Swagger UI wired up and non-public outside development
-- [ ] Health check / app boots green
+- [x] Health check / app boots green
 
 **Notes:**
 
@@ -86,6 +86,11 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
   isn't mounted at all, which already satisfies "non-public outside
   development". Revisit if a later session wants it reachable (behind auth)
   in `production`/`test` too.
+- `@nestjs/terminus` doesn't declare a compatible peer range for
+  `@nestjs/common`/`core` 12.x yet, so `GET /health` is a plain
+  `HealthController` (checks DB connectivity via `PrismaService.$queryRaw`)
+  instead. Excluded from Swagger (`@ApiExcludeController`) since it isn't in
+  `openapi.yaml`.
 
 ## Phase 3 — Authentication
 

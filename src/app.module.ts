@@ -7,6 +7,7 @@ import { AppService } from './app.service.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import configuration from './config/configuration.js';
 import { envValidationSchema } from './config/env.validation.js';
+import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
@@ -28,6 +29,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
       ],
     }),
     PrismaModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
