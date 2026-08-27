@@ -24,7 +24,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - [x] `.env` + `.env.example` with the Week-3 settings from
       `implementation-notes.md` §3
 - [x] Env schema validation that fails at boot
-- [ ] Enable the Swagger CLI plugin in `nest-cli.json`
+- [x] Enable the Swagger CLI plugin in `nest-cli.json`
 
 **Notes:**
 
