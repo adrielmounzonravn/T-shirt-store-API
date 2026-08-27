@@ -73,7 +73,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - [x] Global validation pipe, serialization interceptor, exception filter
       (matching the `ErrorResponse` shape in `openapi.yaml`) and Prisma error
       mapping
-- [ ] helmet, CORS, global rate limit
+- [x] helmet, CORS, global rate limit
 - [ ] Swagger UI wired up and non-public outside development
 - [ ] Health check / app boots green
 
