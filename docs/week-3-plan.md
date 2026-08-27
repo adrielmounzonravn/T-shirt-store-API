@@ -18,7 +18,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 ## Phase 0 — Baseline: infra, deps, config
 
-- [ ] Local run story for Postgres (docker-compose or documented alternative)
+- [x] Local run story for Postgres (docker-compose or documented alternative)
 - [ ] Install the dependencies this week needs (config/validation, validation
       pipe, Passport + JWT, hashing, CASL, helmet, throttler, Swagger, mailer)
 - [ ] `.env` + `.env.example` with the Week-3 settings from
