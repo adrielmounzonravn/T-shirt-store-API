@@ -1,0 +1,1603 @@
+openapi: 3.0.3
+info:
+  title: T-Shirt Store API
+  description: >
+    REST API for the T-shirt store. Covers authentication,
+    catalog (products + variants/SKU), cart, Stripe checkout (Payment Links
+    and Payment Intents), order history with filters, likes, and stock notifications.
+    Specification consistent with the final database schema (`db-schema.md`).
+    Optional features (delivery-person role, `delivered` status, promo codes) are
+    out of scope and deliberately absent from this contract.
+
+
+    **Path-naming convention.** A path is prefixed with `/me` when, and only when,
+    it addresses a collection whose membership is defined by the authenticated
+    user, carries no resource id identifying whose it is, and is unreachable by
+    any other role — currently `/me/cart*` and `/me/liked-products*`. Everything
+    else keeps a plain resource path: `/orders` because it is role-polymorphic
+    (Client sees own, Manager sees all), `/orders/{orderId}` because it is
+    addressed by id and reachable by both roles, and `/checkout/*` because it
+    names an action rather than a collection.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:3000
+    description: Local
+
+tags:
+  - name: Auth
+    description: Sign up, sign in, password reset, and email verification.
+  - name: Products
+    description: Product catalog browsing and management.
+  - name: Product Variants (SKU)
+    description: Size/color/fit/gender variants (SKUs) of a product, including stock and price.
+  - name: Product Images
+    description: Images attached to products and variants.
+  - name: Likes
+    description: The authenticated user's liked products, under /me/liked-products.
+  - name: Cart
+    description: The authenticated user's active shopping cart and its items, under /me/cart.
+  - name: Checkout
+    description: Stripe-based checkout via Payment Links and Payment Intents.
+  - name: Orders
+    description: >
+      Order history and status. Role-polymorphic, so it lives at /orders rather
+      than /me/orders — see the path-naming convention below.
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ============================================================
+  # AUTH
+  # ============================================================
+  # No /auth/signout: JWTs are stateless (no sessions table), so the
+  # server has nothing to invalidate. Sign-out is client-side: discard
+  # the access token.
+  /auth/signup:
+    post:
+      tags: [Auth]
+      summary: Sign up
+      description: Sends a verification email with a token; the account cannot sign in until verified.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, fullName]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                fullName:
+                  type: string
+                  maxLength: 120
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /auth/signin:
+    post:
+      tags: [Auth]
+      summary: Sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Account exists but email is not verified yet
+
+  /auth/verify-email:
+    post:
+      tags: [Auth]
+      summary: Verify email with token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        "200":
+          description: Email verified
+        "401":
+          description: Invalid, expired, or already used token
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset
+      security: []
+      description: >
+        Generates a reset token and sends an email with the link.
+        Subject to rate limiting.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "202":
+          description: Reset email sent (always responds 202 regardless of whether the email exists, to avoid leaking account existence)
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password with token
+      security: []
+      description: Subject to rate limiting. On completion, sends an email notifying the password change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token:
+                  type: string
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        "200":
+          description: Password updated
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Invalid, expired, or already used token
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  # ============================================================
+  # PRODUCTS
+  # ============================================================
+  /products:
+    get:
+      tags: [Products]
+      summary: List products (pagination + category filters)
+      security:
+        - {}
+        - bearerAuth: []
+      description: >
+        "Category" is derived from the gender/size/fit/color filters on the variants
+        (documented decision: the store does not model a separate Category entity).
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: gender
+          in: query
+          schema:
+            $ref: "#/components/schemas/Gender"
+        - name: size
+          in: query
+          schema:
+            $ref: "#/components/schemas/Size"
+        - name: fit
+          in: query
+          schema:
+            $ref: "#/components/schemas/Fit"
+        - name: color
+          in: query
+          schema:
+            $ref: "#/components/schemas/Color"
+        - name: status
+          in: query
+          description: Only Manager can filter/view disabled products
+          schema:
+            $ref: "#/components/schemas/ProductStatus"
+      responses:
+        "200":
+          description: Paginated product list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+                  pagination:
+                    $ref: "#/components/schemas/PaginationMeta"
+
+    post:
+      tags: [Products]
+      summary: Create product, optionally with its variants (Manager)
+      description: >
+        Two flows through one endpoint, decided by the optional `variants` array:
+
+        - **With `variants` (1 or more):** product and SKUs are created in a single
+          transaction and the product is born `status=enabled` — it already has
+          something purchasable, so the intermediate "product with no SKUs" state
+          never exists. If any variant fails validation, nothing is persisted.
+
+        - **Without `variants`:** product is created `status=disabled` (the DB
+          default) — a product with no SKUs must not be visible/purchasable to
+          clients. Add variants via POST /products/{productId}/variants and enable
+          it explicitly via PATCH /products/{productId}/enable.
+
+        Images are not part of this call (they are multipart/form-data) — upload
+        them afterwards via POST /products/{productId}/images.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductCreateInput"
+      responses:
+        "201":
+          description: >
+            Product created. `variants` is the array of SKUs created in the same
+            transaction — empty when the request did not include any.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: >
+            Two or more entries in `variants` share the same
+            size/color/fit/gender combination — the combination must be unique
+            per product (partial unique index one_active_combo_per_product).
+
+  /products/{productId}:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    get:
+      tags: [Products]
+      summary: Get product detail (with variants and images)
+      security: []
+      description: Visible to both logged-in and non-logged-in users.
+      responses:
+        "200":
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags: [Products]
+      summary: Update product (Manager)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdateInput"
+      responses:
+        "200":
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [Products]
+      summary: Delete product (Manager)
+      description: >
+        Soft delete (sets deleted_at). Disappears from all listings/GET, but
+        keeps the row so historical orders stay intact. Not reversible via API.
+      responses:
+        "204":
+          description: Product deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /products/{productId}/disable:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    patch:
+      tags: [Products]
+      summary: Disable product (Manager)
+      description: >
+        Marks the product as disabled. A disabled product is considered
+        non-purchasable even if its variants are enabled (AND at the service layer).
+      responses:
+        "200":
+          description: Product disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /products/{productId}/enable:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    patch:
+      tags: [Products]
+      summary: Enable product (Manager)
+      responses:
+        "200":
+          description: Product enabled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Product"
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [enabled]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ============================================================
+  # PRODUCT IMAGES
+  # ============================================================
+  /products/{productId}/images:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    post:
+      tags: [Product Images]
+      summary: Upload product image (Manager)
+      description: Uploads the image to S3 and stores the key (image_path) in the product_images table. If isCover is true, unsets isCover on any other image of the same product first.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                isCover:
+                  type: boolean
+                  default: false
+      responses:
+        "201":
+          description: Image uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductImage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /products/images/{imageId}:
+    parameters:
+      - name: imageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [Product Images]
+      summary: Set an existing product image as cover (Manager)
+      description: Sets isCover=true on this image and isCover=false on any other image of the same product.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isCover]
+              properties:
+                isCover:
+                  type: boolean
+                  enum: [true]
+      responses:
+        "200":
+          description: Image updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductImage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Product Images]
+      summary: Delete product image (Manager)
+      responses:
+        "204":
+          description: Image deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ============================================================
+  # PRODUCT VARIANTS (SKU)
+  # ============================================================
+  /products/{productId}/variants:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    get:
+      tags: [Product Variants (SKU)]
+      summary: List variants of a product
+      security: []
+      responses:
+        "200":
+          description: Variant list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductVariant"
+
+    post:
+      tags: [Product Variants (SKU)]
+      summary: Create product variant / SKU (Manager)
+      description: >
+        Combination (size, color, fit, gender) unique per product — composite
+        unique constraint on product_variants.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductVariantCreateInput"
+      responses:
+        "201":
+          description: Variant created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductVariant"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A variant with that size/color/fit/gender combination already exists for this product
+
+  /variants/{skuId}:
+    parameters:
+      - $ref: "#/components/parameters/SkuId"
+    get:
+      tags: [Product Variants (SKU)]
+      summary: Get variant detail
+      security: []
+      responses:
+        "200":
+          description: Variant detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductVariant"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags: [Product Variants (SKU)]
+      summary: Update variant (Manager)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductVariantUpdateInput"
+      responses:
+        "200":
+          description: Variant updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductVariant"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [Product Variants (SKU)]
+      summary: Delete variant (Manager)
+      description: >
+        Soft delete (sets deleted_at). Disappears from all listings/GET, but
+        keeps the row so historical orders stay intact. Not reversible via API.
+        Frees up its size/color/fit/gender combination for a new variant.
+      responses:
+        "204":
+          description: Variant deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /variants/{skuId}/disable:
+    parameters:
+      - $ref: "#/components/parameters/SkuId"
+    patch:
+      tags: [Product Variants (SKU)]
+      summary: Disable variant (Manager)
+      responses:
+        "200":
+          description: Variant disabled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ProductVariant"
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [disabled]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /variants/{skuId}/enable:
+    parameters:
+      - $ref: "#/components/parameters/SkuId"
+    patch:
+      tags: [Product Variants (SKU)]
+      summary: Enable variant (Manager)
+      responses:
+        "200":
+          description: Variant enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductVariant"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /variants/{skuId}/images:
+    parameters:
+      - $ref: "#/components/parameters/SkuId"
+    post:
+      tags: [Product Images]
+      summary: Upload variant image (Manager)
+      description: Uploads the image to S3 and stores the key (image_path) in the variant_images table. If isCover is true, unsets isCover on any other image of the same SKU first.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                isCover:
+                  type: boolean
+                  default: false
+      responses:
+        "201":
+          description: Image uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariantImage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /variants/images/{imageId}:
+    parameters:
+      - name: imageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [Product Images]
+      summary: Set an existing variant image as cover (Manager)
+      description: Sets isCover=true on this image and isCover=false on any other image of the same SKU.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isCover]
+              properties:
+                isCover:
+                  type: boolean
+                  enum: [true]
+      responses:
+        "200":
+          description: Image updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariantImage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Product Images]
+      summary: Delete variant image (Manager)
+      responses:
+        "204":
+          description: Image deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ============================================================
+  # LIKES
+  # ============================================================
+  # Likes live entirely under /me/liked-products: the liked_products row is keyed
+  # (user_id, product_id) and user_id always comes from the JWT, never from the
+  # path or body, so the collection is only ever addressable as the caller's own.
+  /me/liked-products:
+    get:
+      tags: [Likes]
+      summary: List product IDs liked by the current client
+      description: >
+        Returns only productIds, not full Product objects. Meant to be called
+        in parallel with GET /products so the client can build a Set of liked
+        productIds and render the like/heart indicator on each item — not to
+        render a full "liked products" listing page.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Liked product IDs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+                      format: uuid
+                  pagination:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /me/liked-products/{productId}:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    put:
+      tags: [Likes]
+      summary: Like a product (Client)
+      description: >
+        Upserts the liked_products row for (userId, productId); userId is taken
+        from the authenticated session (JWT), not from the path or body. PUT
+        rather than POST because the operation is idempotent — liking an already
+        liked product is a no-op that still returns 204, which matches the
+        composite primary key (user_id, product_id).
+      responses:
+        "204":
+          description: Liked (or already liked)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Likes]
+      summary: Unlike a product (Client)
+      description: >
+        Deletes the liked_products row for (userId, productId), where userId
+        comes from the authenticated session (JWT). Idempotent: unliking a
+        product that was not liked still returns 204.
+      responses:
+        "204":
+          description: Unliked (or was not liked)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # ============================================================
+  # CART
+  # ============================================================
+  # Under /me/* because the cart is addressable only as "the caller's own":
+  # there is no cartId in the path and no role can reach another user's cart.
+  /me/cart:
+    get:
+      tags: [Cart]
+      summary: Get current active cart (Client)
+      description: >
+        Returns the status=active cart of the authenticated user. If it does not
+        exist, an empty one is created transparently (the "invisible" cart).
+      responses:
+        "200":
+          description: Active cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /me/cart/items:
+    post:
+      tags: [Cart]
+      summary: Add SKU to cart (Client)
+      description: >
+        If the SKU is already in the active cart, increments quantity (upsert via
+        the composite unique cart_number+sku_id) instead of duplicating the line.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skuId, quantity]
+              properties:
+                skuId:
+                  type: string
+                  format: uuid
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Insufficient stock for the requested quantity
+
+  /me/cart/items/{skuId}:
+    parameters:
+      - $ref: "#/components/parameters/SkuId"
+    patch:
+      tags: [Cart]
+      summary: Update quantity of a cart line (Client)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [Cart]
+      summary: Remove SKU from cart (Client)
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ============================================================
+  # CHECKOUT
+  # ============================================================
+  # Not under /me/*: checkout is an action, not a collection of the caller's
+  # resources. It operates on the caller's own cart, but the path names the
+  # operation (payment-link / payment-intent), so /me adds nothing.
+  # No POST /webhooks/stripe specced yet, but it is mandatory and must be added
+  # with the Stripe integration: checkout.session.completed (Payment Links) and
+  # payment_intent.succeeded (Payment Intents) are the only path pending -> paid,
+  # and the only place stock is decremented.
+  /checkout/payment-link:
+    post:
+      tags: [Checkout]
+      summary: Create a Stripe Payment Link for a single-product purchase (Client)
+      description: >
+        Quick purchase of a single product without going through the visible cart.
+        Internally an "invisible" cart is created with that single SKU and the
+        corresponding order in status=pending, along with the Stripe Payment Link.
+        The invisible cart is created directly with status=confirmed (never
+        active), in the same transaction as the order: cart_numbers has a
+        partial unique index one_active_cart_per_user on (user_id) WHERE
+        status='active', and the user's regular cart is normally already
+        active (GET /me/cart creates it transparently), so an invisible cart
+        created as active would violate that constraint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skuId, quantity]
+              properties:
+                skuId:
+                  type: string
+                  format: uuid
+                quantity:
+                  type: integer
+                  minimum: 1
+                  default: 1
+      responses:
+        "201":
+          description: Payment link created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  order:
+                    $ref: "#/components/schemas/Order"
+                  paymentLink:
+                    type: string
+                    format: uri
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Insufficient stock
+
+  /checkout/payment-intent:
+    post:
+      tags: [Checkout]
+      summary: Create a Stripe Payment Intent to checkout the active cart (Client)
+      description: >
+        Validates stock availability for every line of the active cart,
+        calculates the total, and confirms the cart as an order in
+        status=pending with the associated Payment Intent.
+      responses:
+        "201":
+          description: Payment intent created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  order:
+                    $ref: "#/components/schemas/Order"
+                  paymentIntent:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Insufficient stock for one or more cart items
+        "422":
+          description: Empty cart
+
+  # ============================================================
+  # ORDERS
+  # ============================================================
+  # Deliberately NOT under /me/*, unlike cart and liked-products: /orders is
+  # role-polymorphic (Client -> own, Manager -> all, optionally narrowed with
+  # ?userId=), and /orders/{orderId} is addressed by id and reachable by both
+  # roles. Neither is "the caller's own collection", so the /me prefix would be
+  # a lie. A separate /me/orders was considered and rejected: GET /orders?userId=
+  # already covers it, and no Manager can buy, so it would always return empty.
+  /orders:
+    get:
+      tags: [Orders]
+      summary: List orders (own orders for Client, all orders for Manager)
+      description: >
+        Client sees only their own orders — the userId filter is ignored for
+        them. Manager sees the orders of all clients, and can narrow to a single
+        client with ?userId=, including their own id.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/OrderStatus"
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+            format: float
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+            format: float
+        - name: userId
+          in: query
+          description: Manager only — filter by client
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Paginated order list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Order"
+                  pagination:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /orders/{orderId}:
+    parameters:
+      - $ref: "#/components/parameters/OrderId"
+    get:
+      tags: [Orders]
+      summary: Get order detail
+      description: >
+        Includes the purchased products (with quantities and individual prices
+        frozen at purchase time), payment method, total amount paid, and status.
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /orders/{orderId}/status:
+    parameters:
+      - $ref: "#/components/parameters/OrderId"
+    patch:
+      tags: [Orders]
+      summary: Advance order status (Manager)
+      description: >
+        Manager can advance paid → processing → shipped. Transitions outside the
+        allowed flow return 422.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [processing, shipped]
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: State transition not allowed
+
+  /orders/{orderId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/OrderId"
+    patch:
+      tags: [Orders]
+      summary: Cancel own order (Client)
+      description: Only allowed before the order reaches shipped.
+      responses:
+        "200":
+          description: Order cancelled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Order"
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: [cancelled]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: The order has already been shipped and cannot be cancelled
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SkuId:
+      name: skuId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Invalid input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Authenticated but not allowed to perform this action (CASL)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflicting state (e.g. duplicate email)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        error:
+          type: string
+
+    PaginationMeta:
+      type: object
+      properties:
+        limit:
+          type: integer
+        offset:
+          type: integer
+        total:
+          type: integer
+
+    Role:
+      type: string
+      enum: [manager, client]
+
+    Size:
+      type: string
+      enum: [xs, s, m, l, xl, xxl]
+
+    Color:
+      type: string
+      enum: [red, blue, white, black, gray]
+
+    Fit:
+      type: string
+      enum: [regular, slim, oversize]
+
+    Gender:
+      type: string
+      enum: [men, women, unisex, kids]
+
+    ProductStatus:
+      type: string
+      enum: [enabled, disabled]
+
+    OrderStatus:
+      type: string
+      enum: [pending, paid, processing, shipped, cancelled]
+
+    CartStatus:
+      type: string
+      enum: [active, confirmed, expired]
+
+    PaymentMethod:
+      type: string
+      enum: [payment_link, payment_intent]
+
+    User:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        role:
+          allOf:
+            - $ref: "#/components/schemas/Role"
+          default: client
+        isActive:
+          type: boolean
+        isVerified:
+          type: boolean
+          default: false
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProductImage:
+      type: object
+      properties:
+        imageId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        imagePath:
+          type: string
+          description: S3 key (image_path) stored for this image, used by the backend to reconstruct the URL.
+        isCover:
+          type: boolean
+          default: false
+          description: Whether this is the product's cover image. At most one image per product can be true.
+        createdAt:
+          type: string
+          format: date-time
+
+    VariantImage:
+      type: object
+      properties:
+        imageId:
+          type: string
+          format: uuid
+        skuId:
+          type: string
+          format: uuid
+        imagePath:
+          type: string
+          description: S3 key (image_path) stored for this image, used by the backend to reconstruct the URL.
+        isCover:
+          type: boolean
+          default: false
+          description: Whether this is the variant's cover image. At most one image per SKU can be true.
+        createdAt:
+          type: string
+          format: date-time
+
+    Product:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        detail:
+          type: string
+        status:
+          allOf:
+            - $ref: "#/components/schemas/ProductStatus"
+          default: disabled
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductImage"
+          description: The image with isCover=true (if any) is the product's cover image.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProductDetail:
+      allOf:
+        - $ref: "#/components/schemas/Product"
+        - type: object
+          properties:
+            variants:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProductVariant"
+
+    ProductCreateInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        detail:
+          type: string
+          maxLength: 2000
+        variants:
+          type: array
+          minItems: 1
+          maxItems: 50
+          description: >
+            Optional. When present, the SKUs are created together with the product
+            in one transaction and the product is created with status=enabled.
+            When omitted, the product is created with status=disabled and has no
+            SKUs yet. Each entry must have a distinct size/color/fit/gender
+            combination.
+          items:
+            $ref: "#/components/schemas/ProductVariantCreateInput"
+
+    ProductUpdateInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        detail:
+          type: string
+          maxLength: 2000
+
+    ProductVariant:
+      type: object
+      properties:
+        skuId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        size:
+          $ref: "#/components/schemas/Size"
+        color:
+          $ref: "#/components/schemas/Color"
+        fit:
+          $ref: "#/components/schemas/Fit"
+        gender:
+          $ref: "#/components/schemas/Gender"
+        stock:
+          type: integer
+          minimum: 0
+        price:
+          type: number
+          format: float
+          minimum: 0.01
+          maximum: 9999.99
+          multipleOf: 0.01
+          description: numeric(6,2), CHECK price > 0
+        status:
+          allOf:
+            - $ref: "#/components/schemas/ProductStatus"
+          default: enabled
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/VariantImage"
+          description: The image with isCover=true (if any) is the variant's cover image.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProductVariantCreateInput:
+      type: object
+      required: [size, color, fit, gender, stock, price]
+      properties:
+        size:
+          $ref: "#/components/schemas/Size"
+        color:
+          $ref: "#/components/schemas/Color"
+        fit:
+          $ref: "#/components/schemas/Fit"
+        gender:
+          $ref: "#/components/schemas/Gender"
+        stock:
+          type: integer
+          minimum: 0
+          default: 0
+        price:
+          type: number
+          format: float
+          minimum: 0.01
+          maximum: 9999.99
+          multipleOf: 0.01
+
+    ProductVariantUpdateInput:
+      type: object
+      properties:
+        stock:
+          type: integer
+          minimum: 0
+        price:
+          type: number
+          format: float
+          minimum: 0.01
+          maximum: 9999.99
+          multipleOf: 0.01
+
+    CartItem:
+      type: object
+      properties:
+        skuId:
+          type: string
+          format: uuid
+        variant:
+          $ref: "#/components/schemas/ProductVariant"
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: number
+          format: float
+          nullable: true
+          description: Null while the cart is active; frozen once confirmed as an order.
+
+    Cart:
+      type: object
+      properties:
+        cartNumber:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/CartStatus"
+        expiresAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItem"
+        subtotal:
+          type: number
+          format: float
+          description: Calculated dynamically from each variant's current price (not yet confirmed as an order).
+
+    OrderItem:
+      type: object
+      properties:
+        skuId:
+          type: string
+          format: uuid
+        variant:
+          $ref: "#/components/schemas/OrderItemVariant"
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+          format: float
+          description: Price frozen at the moment the order was confirmed.
+        lineTotal:
+          type: number
+          format: float
+
+    OrderItemVariant:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+        size:
+          $ref: "#/components/schemas/Size"
+        color:
+          $ref: "#/components/schemas/Color"
+        fit:
+          $ref: "#/components/schemas/Fit"
+        gender:
+          $ref: "#/components/schemas/Gender"
+
+    Order:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        cartNumber:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+          description: Owner of the order, resolved via cartNumber -> cart_numbers.user_id.
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        paymentMethod:
+          $ref: "#/components/schemas/PaymentMethod"
+        totalAmount:
+          type: number
+          format: float
+          description: Calculated dynamically as SUM(unit_price * quantity).
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    OrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/Order"
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderItem"
