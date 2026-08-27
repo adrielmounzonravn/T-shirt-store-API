@@ -74,10 +74,18 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
       (matching the `ErrorResponse` shape in `openapi.yaml`) and Prisma error
       mapping
 - [x] helmet, CORS, global rate limit
-- [ ] Swagger UI wired up and non-public outside development
+- [x] Swagger UI wired up and non-public outside development
 - [ ] Health check / app boots green
 
 **Notes:**
+
+- Diverged from `implementation-notes.md` §13's "basic auth behind a
+  `NODE_ENV` check": no basic-auth package or Swagger credentials are
+  configured anywhere in `docs/`, so instead `SwaggerModule.setup` (mounted at
+  `/docs`) is only called when `nodeEnv === 'development'` — outside that it
+  isn't mounted at all, which already satisfies "non-public outside
+  development". Revisit if a later session wants it reachable (behind auth)
+  in `production`/`test` too.
 
 ## Phase 3 — Authentication
 
