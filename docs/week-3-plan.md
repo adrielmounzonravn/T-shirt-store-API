@@ -47,9 +47,9 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 ## Phase 1 — Data model
 
 - [x] Translate the DBML into `schema.prisma`
-- [ ] First migration, hand-edited with the partial indexes and CHECK
+- [x] First migration, hand-edited with the partial indexes and CHECK
       constraints from `implementation-notes.md` §1
-- [ ] Migration applies from scratch on a clean database
+- [x] Migration applies from scratch on a clean database
 - [ ] Seed script (a manager, a client, a couple of products/variants)
 
 **Notes:**
