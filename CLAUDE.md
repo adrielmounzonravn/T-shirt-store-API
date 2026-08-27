@@ -14,7 +14,7 @@ A NestJS + Prisma + PostgreSQL T-shirt store API (capstone project, see `docs/ch
 
 The step-by-step plan for the current checkpoint, and the way sessions hand off context to each other. Read it before starting work to see what's done and what's next, and keep it current:
 
-- **Tick the step you finished** (`[ ]` → `[x]`) as part of the same task — don't leave it for the user. Commit the step's work first (see **Git commits** below), then tick it in a follow-up commit — never bundle the checkbox flip into the same commit as the code.
+- **Tick the step you finished** (`[ ]` → `[x]`) as part of the same task — don't leave it for the user. A step that lands as a single commit ties the tick into that same commit. A step that spans several commits (see **Git commits** below) gets the tick in a follow-up commit once all of them have landed — don't bundle it into one of the intermediate commits.
 - **Add a note only if a future session would be wrong without it**: a deviation from `docs/`, a blocker, a decision taken on the fly. One or two lines under that phase's **Notes**.
 - **Don't** note what the code already shows, restate the docs, or log routine progress. Short and concise beats complete — the file loses its value once it's noise.
 - If the plan itself turns out wrong, edit it (add/remove/reorder steps) rather than working around it.
