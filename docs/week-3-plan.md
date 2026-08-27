@@ -70,7 +70,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 ## Phase 2 — Application shell
 
 - [x] `PrismaModule` / `PrismaService` + shutdown hooks
-- [ ] Global validation pipe, serialization interceptor, exception filter
+- [x] Global validation pipe, serialization interceptor, exception filter
       (matching the `ErrorResponse` shape in `openapi.yaml`) and Prisma error
       mapping
 - [ ] helmet, CORS, global rate limit
