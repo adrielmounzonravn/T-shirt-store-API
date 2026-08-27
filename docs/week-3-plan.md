@@ -21,7 +21,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - [x] Local run story for Postgres (docker-compose or documented alternative)
 - [x] Install the dependencies this week needs (config/validation, validation
       pipe, Passport + JWT, hashing, CASL, helmet, throttler, Swagger, mailer)
-- [ ] `.env` + `.env.example` with the Week-3 settings from
+- [x] `.env` + `.env.example` with the Week-3 settings from
       `implementation-notes.md` §3
 - [ ] Env schema validation that fails at boot
 - [ ] Enable the Swagger CLI plugin in `nest-cli.json`
@@ -35,6 +35,9 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - Went with `joi` for env validation, `bcrypt` for hashing (native binding
   loaded fine via prebuilds — no ESM/build issue hit, so no need for the
   `bcryptjs` fallback), and `nodemailer` for the mailer.
+- `.env`/`.env.example` add `NODE_ENV`, `PORT`, `DATABASE_URL` (infra, not a
+  §3 domain setting) and `SMTP_*` (nodemailer needs a transport; §3's table
+  doesn't list it).
 
 ## Phase 1 — Data model
 
