@@ -50,9 +50,22 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - [x] First migration, hand-edited with the partial indexes and CHECK
       constraints from `implementation-notes.md` §1
 - [x] Migration applies from scratch on a clean database
-- [ ] Seed script (a manager, a client, a couple of products/variants)
+- [x] Seed script (a manager, a client, a couple of products/variants)
 
 **Notes:**
+
+- Prisma 7 requires an explicit driver adapter (or Accelerate URL) passed to
+  `new PrismaClient({ adapter })` — there is no more implicit `DATABASE_URL`
+  pickup. Added `@prisma/adapter-pg` + `pg`; `PrismaService` in Phase 2 must
+  construct the client the same way.
+- Seed script runs via `tsx` (added as a dev dependency), not plain `node`:
+  the generated Prisma client's own files use `.js`-extension imports meant
+  for `tsc` output, which breaks under Node's native TS type-stripping.
+  Configured in `prisma7.config.ts`'s `migrations.seed`; run with
+  `npx prisma db seed` or `npm run db:seed`.
+- Seed data: `manager@tshirtstore.dev` / `client@tshirtstore.dev` (both
+  pre-verified), two enabled products with two enabled variants each. Upserts
+  by email / guards on product name, so re-running is a no-op.
 
 ## Phase 2 — Application shell
 
