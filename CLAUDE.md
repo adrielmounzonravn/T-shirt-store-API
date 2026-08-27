@@ -8,7 +8,9 @@ A NestJS + Prisma + PostgreSQL T-shirt store API (capstone project, see `docs/ch
 
 **Current scope (this week's checkpoint): authentication, products, and SKUs/variants (basic catalog) only.** Cart, orders, and payments are designed in `docs/` but out of scope for now — don't implement or scaffold them until asked.
 
-**Unit tests are mandatory alongside development.** Write and run `*.spec.ts` tests for each service as you build it, not afterward. There are no E2E tests yet — `test/app.e2e-spec.ts` and the e2e Vitest config exist but e2e coverage isn't part of current scope.
+**Unit tests are mandatory alongside development, and must be written by a separate subagent — never by the agent that wrote the implementation.** Write `*.spec.ts` tests for each service as you build it, not afterward, but delegate the actual test-writing to a subagent (e.g. via the Agent tool) rather than writing them yourself. The subagent must receive the service's public interface (file path, exported methods, types, expected behavior/spec from `docs/`) but **not** the implementation itself or any notes on how it was built — the point is to get tests free of the implementer's blind spots, able to catch missing cases or bugs the implementer wouldn't think to check. There are no E2E tests yet — `test/app.e2e-spec.ts` and the e2e Vitest config exist but e2e coverage isn't part of current scope.
+
+**Delegate long or extensive tasks to subagents** to keep the main agent's context clean — a saturated context tends to lose track of details from earlier phases of `docs/` or this file. Prefer spawning a subagent for broad exploration, multi-file implementation, or any step that would otherwise consume a large chunk of context, rather than doing it all inline.
 
 ## Working checklist — `docs/week-3-plan.md`
 
