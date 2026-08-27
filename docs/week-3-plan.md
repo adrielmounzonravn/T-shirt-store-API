@@ -94,7 +94,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 ## Phase 3 — Authentication
 
-- [ ] Users module (lookup + creation, password hashing)
+- [x] Users module (lookup + creation, password hashing)
 - [ ] Sign up, sign in (Passport local + JWT strategy)
 - [ ] Email verification endpoint
 - [ ] Forgot password / reset password with tokens, plus the stricter rate limit

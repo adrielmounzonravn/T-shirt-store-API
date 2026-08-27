@@ -9,6 +9,7 @@ import configuration from './config/configuration.js';
 import { envValidationSchema } from './config/env.validation.js';
 import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     }),
     PrismaModule,
     HealthModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [
