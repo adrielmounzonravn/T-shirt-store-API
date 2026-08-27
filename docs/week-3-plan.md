@@ -19,7 +19,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 ## Phase 0 — Baseline: infra, deps, config
 
 - [x] Local run story for Postgres (docker-compose or documented alternative)
-- [ ] Install the dependencies this week needs (config/validation, validation
+- [x] Install the dependencies this week needs (config/validation, validation
       pipe, Passport + JWT, hashing, CASL, helmet, throttler, Swagger, mailer)
 - [ ] `.env` + `.env.example` with the Week-3 settings from
       `implementation-notes.md` §3
@@ -27,6 +27,14 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - [ ] Enable the Swagger CLI plugin in `nest-cli.json`
 
 **Notes:**
+
+- `@nestjs/throttler` (latest published: 6.5.0) hasn't updated its peer range
+  for `@nestjs/common`/`core` 12.x yet — installed with `--legacy-peer-deps`.
+  Re-check for a compatible release before assuming this workaround is still
+  needed.
+- Went with `joi` for env validation, `bcrypt` for hashing (native binding
+  loaded fine via prebuilds — no ESM/build issue hit, so no need for the
+  `bcryptjs` fallback), and `nodemailer` for the mailer.
 
 ## Phase 1 — Data model
 
