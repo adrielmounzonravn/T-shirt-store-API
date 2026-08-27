@@ -23,11 +23,16 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
       pipe, Passport + JWT, hashing, CASL, helmet, throttler, Swagger, mailer)
 - [x] `.env` + `.env.example` with the Week-3 settings from
       `implementation-notes.md` §3
-- [ ] Env schema validation that fails at boot
+- [x] Env schema validation that fails at boot
 - [ ] Enable the Swagger CLI plugin in `nest-cli.json`
 
 **Notes:**
 
+- `@nestjs/config` 12.x's `validationSchema` expects a Standard Schema
+  (https://standardschema.dev), not a raw Joi call — Joi 18 implements it
+  natively, so `Joi.object({...})` still works, but Joi-specific options (e.g.
+  `abortEarly`) must be passed as `validationOptions: { libraryOptions: {...} }`,
+  not flat.
 - `@nestjs/throttler` (latest published: 6.5.0) hasn't updated its peer range
   for `@nestjs/common`/`core` 12.x yet — installed with `--legacy-peer-deps`.
   Re-check for a compatible release before assuming this workaround is still
