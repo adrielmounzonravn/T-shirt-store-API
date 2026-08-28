@@ -26,7 +26,13 @@ async function bootstrap() {
   });
 
   app.enableShutdownHooks();
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   if (nodeEnv === 'development') {
     const swaggerConfig = new DocumentBuilder()

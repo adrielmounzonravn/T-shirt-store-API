@@ -227,9 +227,16 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 - [ ] Generated Swagger compared against `openapi.yaml`; differences resolved
       (the spec wins)
-- [ ] OWASP checklist pass (`implementation-notes.md` §13)
+- [x] OWASP checklist pass (`implementation-notes.md` §13)
 - [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:cov` green
 - [ ] `CLAUDE.md` scope paragraph updated to match what exists
 - [ ] `next-phase.md` updated with anything deferred out of Week 3
 
 **Notes:**
+
+- Swagger-vs-spec comparison done; the full list of differences and files to
+  touch is logged in `docs/pendings.md` (not fixed yet — pending detailed
+  review before implementing).
+- OWASP checklist pass done; all items compliant except one soft gap
+  (`ValidationPipe` missing `forbidNonWhitelisted: true`), logged in
+  `docs/pendings.md`.
