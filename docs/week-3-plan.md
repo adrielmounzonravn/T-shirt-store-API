@@ -138,7 +138,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 ## Phase 5 — Products
 
-- [ ] List with pagination + category search, public (logged and non-logged)
+- [x] List with pagination + category search, public (logged and non-logged)
 - [ ] Detail, with a response shape that does not force one request per row
 - [ ] Create (with the optional atomic `variants[]`), update, soft delete
 - [ ] Enable / disable
@@ -146,6 +146,32 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - [ ] Unit tests for the service
 
 **Notes:**
+
+- `@nestjs/swagger`'s CLI plugin (12.0.0) generates a broken (non-`async`)
+  `await import()` for any class whose property is typed as another exported
+  class from a different file, under this repo's ESM output — breaks at
+  runtime with `SyntaxError: Unexpected reserved word`. Bumped to `12.0.1`
+  (`--legacy-peer-deps`, same as `@nestjs/throttler`), which hoists the
+  dynamic import instead. Affects any future nested response entity
+  (`ProductDetail.variants[]`, `Order` lines, etc.) — keep this version pin.
+- `GET /products` is public but optionally authenticated (`security: [{},
+  bearerAuth: []]`): added `OptionalJwtAuthGuard` (`src/auth/guards/`), which
+  swallows the missing/invalid-token case instead of 401ing, so a logged-in
+  Manager can still use the `status` filter. Only Manager may see/filter
+  `disabled` products; everyone else is clamped to `status: enabled`
+  regardless of the query param — enforced in `ProductsService`, not CASL
+  (role-shaped check, not ownership-shaped).
+- Found and fixed a pre-existing bug (unrelated to Products, present since
+  Phase 3): `AuthModule` imported bare `PassportModule` instead of
+  `PassportModule.register({})`, so `AuthModuleOptions` was never provided and
+  the app crashed at boot (`UnknownDependenciesException` on `LocalAuthGuard`)
+  the first time anyone actually ran `npm run start:dev` end-to-end. Any
+  module using `AuthGuard()` (including `ProductsModule`) needs its own
+  `PassportModule.register({})` import too, since `AuthModule` exports
+  nothing.
+- "Category" has no dedicated entity — `gender`/`size`/`fit`/`color` filter on
+  the product's non-soft-deleted `variants` via a Prisma `variants.some(...)`
+  relation filter, per `openapi.yaml`'s description on `GET /products`.
 
 ## Phase 6 — SKUs / variants
 
