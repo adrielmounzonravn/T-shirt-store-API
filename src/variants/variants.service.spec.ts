@@ -433,6 +433,32 @@ describe('VariantsService', () => {
       expect(args.where).toMatchObject({ deletedAt: null });
     });
 
+    it('restricts the nested product filter to enabled, non-deleted for a non-manager caller', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+
+      await service.findOne('variant-1', clientUser);
+
+      const [args] = prisma.productVariant.findFirst.mock.calls[0] as [
+        { where?: { product?: Record<string, unknown> } },
+      ];
+      expect(args.where?.product).toMatchObject({
+        deletedAt: null,
+        status: 'enabled',
+      });
+    });
+
+    it('does not restrict the nested product status filter for a manager caller', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+
+      await service.findOne('variant-1', managerUser);
+
+      const [args] = prisma.productVariant.findFirst.mock.calls[0] as [
+        { where?: { product?: { deletedAt?: unknown; status?: unknown } } },
+      ];
+      expect(args.where?.product).toMatchObject({ deletedAt: null });
+      expect(args.where?.product?.status).not.toBe('enabled');
+    });
+
     it('resolves a ProductVariantEntity reflecting the row, with price normalized to a number', async () => {
       prisma.productVariant.findFirst.mockResolvedValue(variantRow);
 
