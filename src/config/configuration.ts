@@ -9,6 +9,10 @@ export default () => ({
 
   auth: {
     resetTokenTtlHours: parseInt(process.env.RESET_TOKEN_TTL_HOURS ?? '', 10),
+    emailVerificationTokenTtlHours: parseInt(
+      process.env.EMAIL_VERIFICATION_TOKEN_TTL_HOURS ?? '',
+      10,
+    ),
     bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS ?? '', 10),
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN,

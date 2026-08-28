@@ -11,6 +11,7 @@ export const envValidationSchema = Joi.object({
 
   CART_TTL_HOURS: Joi.number().required(),
   RESET_TOKEN_TTL_HOURS: Joi.number().required(),
+  EMAIL_VERIFICATION_TOKEN_TTL_HOURS: Joi.number().required(),
   LOW_STOCK_THRESHOLD: Joi.number().required(),
   BCRYPT_SALT_ROUNDS: Joi.number().required(),
 
