@@ -31,6 +31,34 @@ describe('CaslAbilityFactory', () => {
       expect(ability.can('update', 'ProductVariant')).toBe(true);
       expect(ability.can('delete', 'ProductVariant')).toBe(true);
     });
+
+    it('can manage/create/read/update/delete ProductImage', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: Role.manager,
+      });
+
+      expect(ability.can('manage', 'ProductImage')).toBe(true);
+      expect(ability.can('create', 'ProductImage')).toBe(true);
+      expect(ability.can('read', 'ProductImage')).toBe(true);
+      expect(ability.can('update', 'ProductImage')).toBe(true);
+      expect(ability.can('delete', 'ProductImage')).toBe(true);
+    });
+
+    it('can manage/create/read/update/delete VariantImage', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: Role.manager,
+      });
+
+      expect(ability.can('manage', 'VariantImage')).toBe(true);
+      expect(ability.can('create', 'VariantImage')).toBe(true);
+      expect(ability.can('read', 'VariantImage')).toBe(true);
+      expect(ability.can('update', 'VariantImage')).toBe(true);
+      expect(ability.can('delete', 'VariantImage')).toBe(true);
+    });
   });
 
   describe('client', () => {
@@ -60,6 +88,34 @@ describe('CaslAbilityFactory', () => {
       expect(ability.cannot('update', 'ProductVariant')).toBe(true);
       expect(ability.cannot('delete', 'ProductVariant')).toBe(true);
       expect(ability.cannot('manage', 'ProductVariant')).toBe(true);
+    });
+
+    it('gets no ability at all on ProductImage, not even read', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-2',
+        role: Role.client,
+      });
+
+      expect(ability.cannot('read', 'ProductImage')).toBe(true);
+      expect(ability.cannot('create', 'ProductImage')).toBe(true);
+      expect(ability.cannot('update', 'ProductImage')).toBe(true);
+      expect(ability.cannot('delete', 'ProductImage')).toBe(true);
+      expect(ability.cannot('manage', 'ProductImage')).toBe(true);
+    });
+
+    it('gets no ability at all on VariantImage, not even read', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-2',
+        role: Role.client,
+      });
+
+      expect(ability.cannot('read', 'VariantImage')).toBe(true);
+      expect(ability.cannot('create', 'VariantImage')).toBe(true);
+      expect(ability.cannot('update', 'VariantImage')).toBe(true);
+      expect(ability.cannot('delete', 'VariantImage')).toBe(true);
+      expect(ability.cannot('manage', 'VariantImage')).toBe(true);
     });
   });
 

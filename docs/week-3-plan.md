@@ -209,11 +209,19 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 ## Phase 7 — Images (stretch — move to Week 4 if time runs out)
 
-- [ ] Product and variant image upload/delete endpoints
-- [ ] Cover-image rule enforced
+- [x] Product and variant image upload/delete endpoints
+- [x] Cover-image rule enforced
 - [ ] Storage backend (S3) or a documented placeholder
 
 **Notes:**
+
+- `StorageService` (`src/storage/`) isolates the S3-shaped surface
+  (`buildObjectKey`, `upload`, `delete`) the images feature needs; only
+  `buildObjectKey` has real logic today. `upload`/`delete` are deliberate
+  no-op stubs (resolve immediately, no network I/O) — the actual
+  `@aws-sdk/client-s3` wiring is still pending, per `next-phase.md`'s
+  dependency list. Everything else (endpoints, DB writes, cover-uniqueness
+  transaction, validation, CASL) is fully functional now.
 
 ## Phase 8 — Close the checkpoint
 
