@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Ability, AbilityBuilder, type AbilityClass } from '@casl/ability';
 import { Role } from '../generated/prisma/enums.js';
 
-export type Subjects = 'Product' | 'ProductVariant' | 'all';
+export type Subjects =
+  'Product' | 'ProductVariant' | 'ProductImage' | 'VariantImage' | 'all';
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete';
 export type AppAbility = Ability<[Action, Subjects]>;
 
@@ -21,6 +22,8 @@ export class CaslAbilityFactory {
     if (user.role === Role.manager) {
       can('manage', 'Product');
       can('manage', 'ProductVariant');
+      can('manage', 'ProductImage');
+      can('manage', 'VariantImage');
     } else {
       can('read', 'Product');
       can('read', 'ProductVariant');

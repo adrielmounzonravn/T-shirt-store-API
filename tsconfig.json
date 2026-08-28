@@ -17,7 +17,7 @@
     "skipLibCheck": true,
     "strict": true,
     "strictPropertyInitialization": false,
-    "types": ["vitest/globals", "node"]
+    "types": ["vitest/globals", "node", "multer"]
   },
   "exclude": ["node_modules", "dist", "test/app.e2e-spec.ts"]
 }
