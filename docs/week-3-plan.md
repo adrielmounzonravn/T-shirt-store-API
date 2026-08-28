@@ -190,7 +190,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - [x] Detail, update, soft delete
 - [x] Enable / disable
 - [x] Sellability as an AND across product + variant
-- [ ] Unit tests for the service
+- [x] Unit tests for the service
 
 **Notes:**
 

@@ -636,4 +636,170 @@ describe('VariantsService', () => {
       expect(result).toBeUndefined();
     });
   });
+
+  describe('enable', () => {
+    it('throws NotFoundException when the target variant does not exist', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.enable('missing-sku')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.productVariant.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the target variant is soft-deleted', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.enable('variant-1')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.productVariant.update).not.toHaveBeenCalled();
+    });
+
+    it('enables a disabled variant', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(disabledVariantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...disabledVariantRow,
+        status: 'enabled',
+      });
+
+      await expect(service.enable('variant-2')).resolves.not.toThrow();
+      expect(prisma.productVariant.update).toHaveBeenCalled();
+    });
+
+    it('sets status to enabled in the update call', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(disabledVariantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...disabledVariantRow,
+        status: 'enabled',
+      });
+
+      await service.enable('variant-2');
+
+      const [args] = prisma.productVariant.update.mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      expect(args.data).toMatchObject({ status: 'enabled' });
+    });
+
+    it('succeeds when enabling an already-enabled variant', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue(variantRow);
+
+      await expect(service.enable('variant-1')).resolves.not.toThrow();
+
+      const [args] = prisma.productVariant.update.mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      expect(args.data).toMatchObject({ status: 'enabled' });
+    });
+
+    it('allows enabling a variant whose parent product is disabled', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(disabledVariantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...disabledVariantRow,
+        status: 'enabled',
+      });
+
+      await expect(service.enable('variant-2')).resolves.not.toThrow();
+      expect(prisma.productVariant.update).toHaveBeenCalled();
+    });
+
+    it('resolves a ProductVariantEntity reflecting the enabled row, with price normalized to a number', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(disabledVariantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...disabledVariantRow,
+        status: 'enabled',
+      });
+
+      const result = await service.enable('variant-2');
+
+      expect(result).toMatchObject({ id: 'variant-2', status: 'enabled' });
+      expect(typeof result.price).toBe('number');
+      expect(result.price).toBe(29.99);
+    });
+  });
+
+  describe('disable', () => {
+    it('throws NotFoundException when the target variant does not exist', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.disable('missing-sku')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.productVariant.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the target variant is soft-deleted', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.disable('variant-1')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.productVariant.update).not.toHaveBeenCalled();
+    });
+
+    it('disables an enabled variant', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...variantRow,
+        status: 'disabled',
+      });
+
+      await expect(service.disable('variant-1')).resolves.not.toThrow();
+      expect(prisma.productVariant.update).toHaveBeenCalled();
+    });
+
+    it('sets status to disabled in the update call', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...variantRow,
+        status: 'disabled',
+      });
+
+      await service.disable('variant-1');
+
+      const [args] = prisma.productVariant.update.mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      expect(args.data).toMatchObject({ status: 'disabled' });
+    });
+
+    it('succeeds when disabling an already-disabled variant', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(disabledVariantRow);
+      prisma.productVariant.update.mockResolvedValue(disabledVariantRow);
+
+      await expect(service.disable('variant-2')).resolves.not.toThrow();
+
+      const [args] = prisma.productVariant.update.mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      expect(args.data).toMatchObject({ status: 'disabled' });
+    });
+
+    it('allows disabling a variant whose parent product is disabled', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...variantRow,
+        status: 'disabled',
+      });
+
+      await expect(service.disable('variant-1')).resolves.not.toThrow();
+      expect(prisma.productVariant.update).toHaveBeenCalled();
+    });
+
+    it('resolves a ProductVariantEntity reflecting the disabled row, with price normalized to a number', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...variantRow,
+        status: 'disabled',
+      });
+
+      const result = await service.disable('variant-1');
+
+      expect(result).toMatchObject({ id: 'variant-1', status: 'disabled' });
+      expect(typeof result.price).toBe('number');
+      expect(result.price).toBe(29.99);
+    });
+  });
 });
