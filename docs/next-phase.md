@@ -24,19 +24,18 @@ together — not just `CLAUDE.md`.
       there and implemented alongside the Stripe integration — this note
       says do it "alongside", so don't let the endpoint land in code before
       the spec.
-- [ ] **New dependencies** (none of these are in `package.json` yet — check
-      before assuming any are installed): `@nestjs/config` + a schema
-      validator (Joi/Zod/`class-validator`) for env validation,
-      `class-validator` + `class-transformer` for the `ValidationPipe`,
-      `@nestjs/passport` + `passport` + `passport-jwt` + `@nestjs/jwt`,
-      `bcrypt` or `bcryptjs`/`argon2` (ESM caveat noted in
+- [ ] **New dependencies** (check before assuming any are installed):
+      `@nestjs/config` + a schema validator (Joi/Zod/`class-validator`) for
+      env validation, `class-validator` + `class-transformer` for the
+      `ValidationPipe`, `@nestjs/passport` + `passport` + `passport-jwt` +
+      `@nestjs/jwt`, `bcrypt` or `bcryptjs`/`argon2` (ESM caveat noted in
       `implementation-notes.md` §8), `@casl/ability`, `helmet`,
       `@nestjs/throttler`, `@nestjs/swagger`, `@nestjs/schedule`,
       `@nestjs/bullmq` + `bullmq` (needs Redis — also a deploy-shape item for
-      the architecture write-up), `stripe`, an AWS S3 client
-      (`@aws-sdk/client-s3`), a multipart parser (`multer` /
+      the architecture write-up), `stripe`, a multipart parser (`multer` /
       `@nestjs/platform-express` file interceptor), and a mailer for the
-      password-change and stock-notification emails.
+      password-change and stock-notification emails. `@aws-sdk/client-s3` is
+      already installed and wired (Phase 7, `src/storage/`).
 - [ ] **`nest-cli.json`** — add `"compilerOptions": { "plugins":
       ["@nestjs/swagger"] }` per `implementation-notes.md` §13, before
       relying on inferred `@ApiProperty()` decorators.

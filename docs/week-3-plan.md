@@ -211,17 +211,22 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 - [x] Product and variant image upload/delete endpoints
 - [x] Cover-image rule enforced
-- [ ] Storage backend (S3) or a documented placeholder
+- [x] Storage backend (S3) or a documented placeholder
 
 **Notes:**
 
-- `StorageService` (`src/storage/`) isolates the S3-shaped surface
-  (`buildObjectKey`, `upload`, `delete`) the images feature needs; only
-  `buildObjectKey` has real logic today. `upload`/`delete` are deliberate
-  no-op stubs (resolve immediately, no network I/O) — the actual
-  `@aws-sdk/client-s3` wiring is still pending, per `next-phase.md`'s
-  dependency list. Everything else (endpoints, DB writes, cover-uniqueness
-  transaction, validation, CASL) is fully functional now.
+- `StorageService` (`src/storage/`) now sends real `PutObjectCommand`/
+  `DeleteObjectCommand` calls through an `S3Client` built via
+  `useFactory`+`inject: [ConfigService]` (`src/storage/s3-client.provider.ts`),
+  matching the project's config-construction convention. Bucket
+  `tshirt-store-dev` (`us-east-1`) was created with Block Public Access off
+  and a public-read bucket policy on `s3:GetObject` — no per-object ACL is
+  set, since object ACLs aren't needed (or supported, on buckets with the
+  default "bucket owner enforced" ownership) when the bucket policy already
+  grants public read. `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` are read from
+  `.env`; the factory falls back to the SDK's default credential provider
+  chain (IAM role, etc.) when they're blank, per the Joi schema allowing
+  empty values.
 
 ## Phase 8 — Close the checkpoint
 
