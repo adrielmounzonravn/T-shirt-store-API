@@ -187,12 +187,20 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 ## Phase 6 — SKUs / variants
 
 - [x] List and create under a product
-- [ ] Detail, update, soft delete
+- [x] Detail, update, soft delete
 - [ ] Enable / disable
 - [ ] Sellability as an AND across product + variant
 - [ ] Unit tests for the service
 
 **Notes:**
+
+- `GET /variants/{skuId}` (new `SkuController`, `/variants` prefix, separate
+  from `VariantsController`'s `products/:productId/variants`) applies the
+  product+variant sellability AND for non-Manager callers, same as
+  `findMany`/product reads: a disabled variant OR a variant of a disabled
+  product 404s for anonymous/client, visible to Manager. `update`/`remove`
+  are Manager-only (enforced by guards) and only exclude soft-deleted
+  targets, not disabled ones — same pattern as `ProductsService`.
 
 ## Phase 7 — Images (stretch — move to Week 4 if time runs out)
 

@@ -16,6 +16,8 @@ describe('VariantsService', () => {
     productVariant: {
       findMany: ReturnType<typeof vi.fn>;
       create: ReturnType<typeof vi.fn>;
+      findFirst: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
     };
   };
 
@@ -75,10 +77,13 @@ describe('VariantsService', () => {
       productVariant: {
         findMany: vi.fn(),
         create: vi.fn(),
+        findFirst: vi.fn(),
+        update: vi.fn(),
       },
     };
     prisma.product.findFirst.mockResolvedValue(null);
     prisma.productVariant.findMany.mockResolvedValue([]);
+    prisma.productVariant.findFirst.mockResolvedValue(null);
 
     service = await setupService();
   });
@@ -313,6 +318,322 @@ describe('VariantsService', () => {
       });
       expect(typeof result.price).toBe('number');
       expect(result.price).toBe(29.99);
+    });
+  });
+
+  describe('findOne', () => {
+    it('throws NotFoundException when no variant matches the skuId, for an anonymous caller', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne('missing-sku', undefined)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('throws NotFoundException when no variant matches the skuId, for a manager caller', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne('missing-sku', managerUser)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('throws NotFoundException for a soft-deleted variant, treated as not found (findFirst returns null)', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne('variant-1', managerUser)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('throws NotFoundException for a client caller when the variant itself is disabled', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne('variant-2', clientUser)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('throws NotFoundException for an anonymous caller when the parent product is disabled', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne('variant-1', undefined)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('resolves the variant for an anonymous caller when the variant and its product are both enabled', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+
+      await expect(
+        service.findOne('variant-1', undefined),
+      ).resolves.not.toThrow();
+    });
+
+    it('resolves the variant for a client caller when the variant and its product are both enabled', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+
+      await expect(
+        service.findOne('variant-1', clientUser),
+      ).resolves.not.toThrow();
+    });
+
+    it('resolves a disabled variant for a manager caller', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(disabledVariantRow);
+
+      await expect(
+        service.findOne('variant-2', managerUser),
+      ).resolves.not.toThrow();
+    });
+
+    it('resolves a variant whose parent product is disabled for a manager caller', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+
+      await expect(
+        service.findOne('variant-1', managerUser),
+      ).resolves.not.toThrow();
+    });
+
+    it('restricts the query to enabled status for a non-manager caller', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+
+      await service.findOne('variant-1', clientUser);
+
+      const [args] = prisma.productVariant.findFirst.mock.calls[0] as [
+        { where?: Record<string, unknown> },
+      ];
+      expect(args.where).toMatchObject({ status: 'enabled' });
+    });
+
+    it('does not restrict variant status in the query for a manager caller', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+
+      await service.findOne('variant-1', managerUser);
+
+      const [args] = prisma.productVariant.findFirst.mock.calls[0] as [
+        { where?: { status?: unknown } },
+      ];
+      expect(args.where?.status).not.toBe('enabled');
+    });
+
+    it('excludes soft-deleted variants from the query for any caller', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+
+      await service.findOne('variant-1', managerUser);
+
+      const [args] = prisma.productVariant.findFirst.mock.calls[0] as [
+        { where?: Record<string, unknown> },
+      ];
+      expect(args.where).toMatchObject({ deletedAt: null });
+    });
+
+    it('resolves a ProductVariantEntity reflecting the row, with price normalized to a number', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+
+      const result = await service.findOne('variant-1', managerUser);
+
+      expect(result).toMatchObject({
+        id: 'variant-1',
+        productId: 'product-1',
+        size: 'm',
+        color: 'black',
+        fit: 'regular',
+        gender: 'men',
+        stock: 10,
+        status: 'enabled',
+      });
+      expect(typeof result.price).toBe('number');
+      expect(result.price).toBe(29.99);
+    });
+  });
+
+  describe('update', () => {
+    it('throws NotFoundException when the target variant does not exist', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.update('missing-sku', { stock: 5 })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.productVariant.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the target variant is soft-deleted', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.update('variant-1', { stock: 5 })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.productVariant.update).not.toHaveBeenCalled();
+    });
+
+    it('allows updating a disabled variant', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(disabledVariantRow);
+      prisma.productVariant.update.mockResolvedValue(disabledVariantRow);
+
+      await expect(
+        service.update('variant-2', { stock: 5 }),
+      ).resolves.not.toThrow();
+      expect(prisma.productVariant.update).toHaveBeenCalled();
+    });
+
+    it('allows updating a variant whose parent product is disabled', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue(variantRow);
+
+      await expect(
+        service.update('variant-1', { stock: 5 }),
+      ).resolves.not.toThrow();
+      expect(prisma.productVariant.update).toHaveBeenCalled();
+    });
+
+    it('only updates stock when only stock is provided in the dto', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...variantRow,
+        stock: 5,
+      });
+
+      await service.update('variant-1', { stock: 5 });
+
+      const [args] = prisma.productVariant.update.mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      expect(args.data).toMatchObject({ stock: 5 });
+      expect(args.data).not.toHaveProperty('price');
+    });
+
+    it('only updates price when only price is provided in the dto', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...variantRow,
+        price: '19.99',
+      });
+
+      await service.update('variant-1', { price: 19.99 });
+
+      const [args] = prisma.productVariant.update.mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      expect(args.data).toMatchObject({ price: 19.99 });
+      expect(args.data).not.toHaveProperty('stock');
+    });
+
+    it('updates both stock and price when both are provided in the dto', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...variantRow,
+        stock: 5,
+        price: '19.99',
+      });
+
+      await service.update('variant-1', { stock: 5, price: 19.99 });
+
+      const [args] = prisma.productVariant.update.mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      expect(args.data).toMatchObject({ stock: 5, price: 19.99 });
+    });
+
+    it('resolves the updated ProductVariantEntity reflecting the new row values, with price normalized to a number', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...variantRow,
+        stock: 5,
+        price: '19.99',
+      });
+
+      const result = await service.update('variant-1', {
+        stock: 5,
+        price: 19.99,
+      });
+
+      expect(result).toMatchObject({ id: 'variant-1', stock: 5 });
+      expect(typeof result.price).toBe('number');
+      expect(result.price).toBe(19.99);
+    });
+  });
+
+  describe('remove', () => {
+    it('throws NotFoundException when the target variant does not exist', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove('missing-sku')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.productVariant.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the variant is already soft-deleted', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove('variant-1')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.productVariant.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException on a second call after the variant has already been removed', async () => {
+      prisma.productVariant.findFirst.mockResolvedValueOnce(variantRow);
+      prisma.productVariant.update.mockResolvedValueOnce({
+        ...variantRow,
+        deletedAt: new Date('2024-06-01T00:00:00.000Z'),
+      });
+
+      await expect(service.remove('variant-1')).resolves.not.toThrow();
+
+      prisma.productVariant.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.remove('variant-1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('allows removing a variant whose parent product is disabled', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...variantRow,
+        deletedAt: new Date('2024-06-01T00:00:00.000Z'),
+      });
+
+      await expect(service.remove('variant-1')).resolves.not.toThrow();
+    });
+
+    it('allows removing a disabled variant', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(disabledVariantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...disabledVariantRow,
+        deletedAt: new Date('2024-06-01T00:00:00.000Z'),
+      });
+
+      await expect(service.remove('variant-2')).resolves.not.toThrow();
+    });
+
+    it('soft deletes by setting deletedAt rather than hard-deleting', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...variantRow,
+        deletedAt: new Date('2024-06-01T00:00:00.000Z'),
+      });
+
+      await service.remove('variant-1');
+
+      const [args] = prisma.productVariant.update.mock.calls[0] as [
+        { data?: Record<string, unknown> },
+      ];
+      expect(args.data).toHaveProperty('deletedAt');
+      expect(args.data?.deletedAt).not.toBeNull();
+    });
+
+    it('resolves undefined on success', async () => {
+      prisma.productVariant.findFirst.mockResolvedValue(variantRow);
+      prisma.productVariant.update.mockResolvedValue({
+        ...variantRow,
+        deletedAt: new Date('2024-06-01T00:00:00.000Z'),
+      });
+
+      const result = await service.remove('variant-1');
+
+      expect(result).toBeUndefined();
     });
   });
 });

@@ -3,11 +3,12 @@ import { PassportModule } from '@nestjs/passport';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { CaslModule } from '../casl/casl.module.js';
 import { VariantsController } from './variants.controller.js';
+import { SkuController } from './sku.controller.js';
 import { VariantsService } from './variants.service.js';
 
 @Module({
   imports: [PrismaModule, PassportModule.register({}), CaslModule],
-  controllers: [VariantsController],
+  controllers: [VariantsController, SkuController],
   providers: [VariantsService],
   exports: [VariantsService],
 })
