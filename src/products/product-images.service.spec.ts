@@ -71,7 +71,6 @@ describe('ProductImagesService', () => {
           prefix: string,
           entityId: string,
           generatedId: string,
-          originalName: string,
           mimeType: string,
         ) => string
       >
@@ -158,7 +157,6 @@ describe('ProductImagesService', () => {
             prefix: string,
             entityId: string,
             generatedId: string,
-            originalName: string,
             mimeType: string,
           ) => string
         >(),
@@ -230,7 +228,6 @@ describe('ProductImagesService', () => {
         'products',
         'product-1',
         expect.any(String),
-        'photo.png',
         'image/png',
       );
     });
@@ -358,6 +355,29 @@ describe('ProductImagesService', () => {
         isCover: true,
       });
     });
+
+    it('deletes the uploaded object from storage and rethrows when the DB transaction fails', async () => {
+      prisma.product.findFirst.mockResolvedValue(enabledProductRow);
+      storage.buildObjectKey.mockReturnValue('products/product-1/xyz.jpg');
+      const dbError = new Error('transaction failed');
+      prisma.$transaction.mockRejectedValue(dbError);
+
+      await expect(
+        service.upload('product-1', makeFile(), { isCover: false }),
+      ).rejects.toThrow(dbError);
+      expect(storage.delete).toHaveBeenCalledWith('products/product-1/xyz.jpg');
+    });
+
+    it('still rethrows the original transaction error when the compensating storage delete also fails', async () => {
+      prisma.product.findFirst.mockResolvedValue(enabledProductRow);
+      const dbError = new Error('transaction failed');
+      prisma.$transaction.mockRejectedValue(dbError);
+      storage.delete.mockRejectedValue(new Error('storage delete failed'));
+
+      await expect(
+        service.upload('product-1', makeFile(), { isCover: false }),
+      ).rejects.toThrow(dbError);
+    });
   });
 
   describe('setCover', () => {
@@ -481,6 +501,28 @@ describe('ProductImagesService', () => {
       const result = await service.remove('image-1');
 
       expect(result).toBeUndefined();
+    });
+
+    it('deletes the ProductImage row before deleting the object from storage', async () => {
+      prisma.productImage.findFirst.mockResolvedValue(imageRow);
+      prisma.productImage.findUnique.mockResolvedValue(imageRow);
+      prisma.productImage.delete.mockResolvedValue(imageRow);
+
+      await service.remove('image-1');
+
+      const dbDeleteOrder =
+        prisma.productImage.delete.mock.invocationCallOrder[0];
+      const storageDeleteOrder = storage.delete.mock.invocationCallOrder[0];
+      expect(dbDeleteOrder).toBeLessThan(storageDeleteOrder);
+    });
+
+    it('does not delete from storage when deleting the ProductImage row fails', async () => {
+      prisma.productImage.findFirst.mockResolvedValue(imageRow);
+      prisma.productImage.findUnique.mockResolvedValue(imageRow);
+      prisma.productImage.delete.mockRejectedValueOnce(new Error('db error'));
+
+      await expect(service.remove('image-1')).rejects.toThrow('db error');
+      expect(storage.delete).not.toHaveBeenCalled();
     });
   });
 });

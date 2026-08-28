@@ -25,29 +25,34 @@ export class VariantImagesService {
       'variants',
       skuId,
       imageId,
-      file.originalname,
       file.mimetype,
     );
 
     await this.storage.upload(key, file);
 
-    const image = await this.prisma.$transaction(async (tx) => {
-      if (dto.isCover) {
-        await tx.variantImage.updateMany({
-          where: { skuId, isCover: true },
-          data: { isCover: false },
-        });
-      }
+    let image;
+    try {
+      image = await this.prisma.$transaction(async (tx) => {
+        if (dto.isCover) {
+          await tx.variantImage.updateMany({
+            where: { skuId, isCover: true },
+            data: { isCover: false },
+          });
+        }
 
-      return tx.variantImage.create({
-        data: {
-          id: imageId,
-          skuId,
-          imagePath: key,
-          isCover: dto.isCover,
-        },
+        return tx.variantImage.create({
+          data: {
+            id: imageId,
+            skuId,
+            imagePath: key,
+            isCover: dto.isCover,
+          },
+        });
       });
-    });
+    } catch (error) {
+      await this.storage.delete(key).catch(() => undefined);
+      throw error;
+    }
 
     return new VariantImageEntity(image);
   }
@@ -80,8 +85,8 @@ export class VariantImagesService {
   async remove(imageId: string): Promise<void> {
     const existing = await this.findImageOrThrow(imageId);
 
-    await this.storage.delete(existing.imagePath);
     await this.prisma.variantImage.delete({ where: { id: imageId } });
+    await this.storage.delete(existing.imagePath);
   }
 
   private async findImageOrThrow(imageId: string) {
