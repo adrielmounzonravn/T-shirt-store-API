@@ -140,7 +140,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 - [x] List with pagination + category search, public (logged and non-logged)
 - [x] Detail, with a response shape that does not force one request per row
-- [ ] Create (with the optional atomic `variants[]`), update, soft delete
+- [x] Create (with the optional atomic `variants[]`), update, soft delete
 - [ ] Enable / disable
 - [ ] Soft-delete and sellability rules applied on every read
 - [ ] Unit tests for the service

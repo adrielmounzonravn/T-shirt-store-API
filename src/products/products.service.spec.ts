@@ -4,6 +4,7 @@ import { NotFoundException } from '@nestjs/common';
 import { ProductsService } from './products.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ListProductsQueryDto } from './dto/list-products-query.dto.js';
+import type { CreateProductDto } from './dto/create-product.dto.js';
 import type { JwtPayload } from '../auth/jwt-payload.interface.js';
 import { Role } from '../generated/prisma/enums.js';
 
@@ -14,7 +15,11 @@ describe('ProductsService', () => {
       findMany: ReturnType<typeof vi.fn>;
       count: ReturnType<typeof vi.fn>;
       findFirst: ReturnType<typeof vi.fn>;
+      create: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+      delete: ReturnType<typeof vi.fn>;
     };
+    $transaction: ReturnType<typeof vi.fn<(arg: unknown) => Promise<unknown>>>;
   };
 
   const managerUser: JwtPayload = { sub: 'user-1', role: Role.manager };
@@ -90,11 +95,21 @@ describe('ProductsService', () => {
         findMany: vi.fn(),
         count: vi.fn(),
         findFirst: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
       },
+      $transaction: vi.fn<(arg: unknown) => Promise<unknown>>(),
     };
     prisma.product.findMany.mockResolvedValue([productRow]);
     prisma.product.count.mockResolvedValue(1);
     prisma.product.findFirst.mockResolvedValue(null);
+    prisma.$transaction.mockImplementation((arg: unknown) => {
+      if (typeof arg === 'function') {
+        return Promise.resolve((arg as (tx: typeof prisma) => unknown)(prisma));
+      }
+      return Promise.all(arg as Promise<unknown>[]);
+    });
 
     service = await setupService();
   });
@@ -528,6 +543,240 @@ describe('ProductsService', () => {
         expect(typeof result.variants[0].price).toBe('number');
         expect(result.variants[0].price).toBe(29.99);
       });
+    });
+  });
+
+  describe('create', () => {
+    const variantDto = {
+      size: 'm',
+      color: 'black',
+      fit: 'regular',
+      gender: 'men',
+      stock: 10,
+      price: 29.99,
+    };
+
+    const getCreateArgs = () =>
+      (
+        prisma.product.create.mock.calls[0] as [
+          { data: Record<string, unknown> },
+        ]
+      )[0];
+
+    describe('with variants', () => {
+      const dto: CreateProductDto = {
+        name: 'Classic Tee',
+        detail: 'A classic t-shirt',
+        variants: [variantDto],
+      } as CreateProductDto;
+
+      beforeEach(() => {
+        prisma.product.create.mockResolvedValue({
+          ...productDetailRow,
+          status: 'enabled',
+        });
+      });
+
+      it('creates the product with status enabled', async () => {
+        await service.create(dto);
+
+        expect(getCreateArgs().data).toMatchObject({ status: 'enabled' });
+      });
+
+      it('passes the variants through to the nested create', async () => {
+        await service.create(dto);
+
+        const data = getCreateArgs().data as {
+          variants?: { create?: unknown[] };
+        };
+        expect(data.variants?.create).toEqual([
+          expect.objectContaining(variantDto),
+        ]);
+      });
+
+      it('returns a ProductDetailEntity reflecting the created product and variants', async () => {
+        const result = await service.create(dto);
+
+        expect(result.status).toBe('enabled');
+        expect(result.variants).toHaveLength(1);
+        expect(result.variants[0]).toMatchObject({
+          id: 'variant-1',
+          productId: 'product-1',
+        });
+        expect(typeof result.variants[0].price).toBe('number');
+      });
+    });
+
+    describe('without variants', () => {
+      const dto: CreateProductDto = {
+        name: 'Classic Tee',
+        detail: 'A classic t-shirt',
+      };
+
+      beforeEach(() => {
+        prisma.product.create.mockResolvedValue({
+          ...productDetailRow,
+          status: 'disabled',
+          variants: [],
+        });
+      });
+
+      it('creates the product with status disabled', async () => {
+        await service.create(dto);
+
+        expect(getCreateArgs().data).toMatchObject({ status: 'disabled' });
+      });
+
+      it('does not include a nested variants create', async () => {
+        await service.create(dto);
+
+        const data = getCreateArgs().data as {
+          variants?: { create?: unknown[] };
+        };
+        expect(data.variants?.create ?? []).toHaveLength(0);
+      });
+
+      it('returns a ProductDetailEntity with an empty variants array', async () => {
+        const result = await service.create(dto);
+
+        expect(result.status).toBe('disabled');
+        expect(result.variants).toEqual([]);
+      });
+    });
+
+    describe('with an empty variants array', () => {
+      const dto: CreateProductDto = {
+        name: 'Classic Tee',
+        detail: 'A classic t-shirt',
+        variants: [],
+      };
+
+      beforeEach(() => {
+        prisma.product.create.mockResolvedValue({
+          ...productDetailRow,
+          status: 'disabled',
+          variants: [],
+        });
+      });
+
+      it('treats an empty variants array the same as no variants: status disabled', async () => {
+        await service.create(dto);
+
+        expect(getCreateArgs().data).toMatchObject({ status: 'disabled' });
+      });
+
+      it('does not include a nested variants create for an empty array', async () => {
+        await service.create(dto);
+
+        const data = getCreateArgs().data as {
+          variants?: { create?: unknown[] };
+        };
+        expect(data.variants?.create ?? []).toHaveLength(0);
+      });
+    });
+  });
+
+  describe('update', () => {
+    const getUpdateArgs = () =>
+      (
+        prisma.product.update.mock.calls[0] as [
+          { where?: Record<string, unknown>; data?: Record<string, unknown> },
+        ]
+      )[0];
+
+    it('updates only the fields provided in a partial dto', async () => {
+      prisma.product.findFirst.mockResolvedValue(productRow);
+      prisma.product.update.mockResolvedValue({
+        ...productRow,
+        name: 'New Name',
+      });
+
+      await service.update('product-1', { name: 'New Name' });
+
+      expect(getUpdateArgs().where).toMatchObject({ id: 'product-1' });
+      expect(getUpdateArgs().data).toMatchObject({ name: 'New Name' });
+      expect(getUpdateArgs().data).not.toHaveProperty('detail');
+    });
+
+    it('returns a ProductEntity reflecting the updated row', async () => {
+      prisma.product.findFirst.mockResolvedValue(productRow);
+      prisma.product.update.mockResolvedValue({
+        ...productRow,
+        name: 'New Name',
+      });
+
+      const result = await service.update('product-1', { name: 'New Name' });
+
+      expect(result).toMatchObject({ id: 'product-1', name: 'New Name' });
+    });
+
+    it('throws NotFoundException when no active product with that id exists', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.update('missing-product', { name: 'New Name' }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.product.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for a soft-deleted product', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.update('product-1', { name: 'New Name' }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.product.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('remove', () => {
+    it('soft-deletes by setting deletedAt, without calling delete', async () => {
+      prisma.product.findFirst.mockResolvedValue(productRow);
+      prisma.product.update.mockResolvedValue({
+        ...productRow,
+        deletedAt: new Date('2024-02-01T00:00:00.000Z'),
+      });
+
+      await service.remove('product-1');
+
+      const [args] = prisma.product.update.mock.calls[0] as [
+        { where?: Record<string, unknown>; data?: Record<string, unknown> },
+      ];
+      expect(args.where).toMatchObject({ id: 'product-1' });
+      expect(args.data?.deletedAt).toBeInstanceOf(Date);
+      expect(prisma.product.delete).not.toHaveBeenCalled();
+    });
+
+    it('resolves without a return value', async () => {
+      prisma.product.findFirst.mockResolvedValue(productRow);
+      prisma.product.update.mockResolvedValue({
+        ...productRow,
+        deletedAt: new Date('2024-02-01T00:00:00.000Z'),
+      });
+
+      const result = await service.remove('product-1');
+
+      expect(result).toBeUndefined();
+    });
+
+    it('throws NotFoundException when no active product with that id exists', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove('missing-product')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.product.update).not.toHaveBeenCalled();
+      expect(prisma.product.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for an already soft-deleted product', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove('product-1')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.product.update).not.toHaveBeenCalled();
+      expect(prisma.product.delete).not.toHaveBeenCalled();
     });
   });
 });
