@@ -233,9 +233,9 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - [x] Generated Swagger compared against `openapi.yaml`; differences resolved
       (the spec wins)
 - [x] OWASP checklist pass (`implementation-notes.md` §13)
-- [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:cov` green
-- [ ] `CLAUDE.md` scope paragraph updated to match what exists
-- [ ] `next-phase.md` updated with anything deferred out of Week 3
+- [x] `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:cov` green
+- [x] `CLAUDE.md` scope paragraph updated to match what exists
+- [x] `next-phase.md` updated with anything deferred out of Week 3
 
 **Notes:**
 
@@ -246,3 +246,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
   are serialization-only.
 - OWASP checklist pass done; all items compliant, including the previous
   soft gap (`ValidationPipe` now sets `forbidNonWhitelisted: true`).
+- Final QA pass (`docs/pendings.md`) fixed: orphaned S3 objects on failed
+  image-upload transactions, DB-before-S3 delete ordering, S3 key extension
+  now derived from mimetype only (not client-supplied filename), and a
+  `VariantsService.findOne` spec gap on the nested product filter.
