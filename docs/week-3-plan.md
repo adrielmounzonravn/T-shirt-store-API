@@ -97,9 +97,9 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - [x] Users module (lookup + creation, password hashing)
 - [x] Sign up, sign in (Passport local + JWT strategy)
 - [x] Email verification endpoint
-- [ ] Forgot password / reset password with tokens, plus the stricter rate limit
+- [x] Forgot password / reset password with tokens, plus the stricter rate limit
       on those endpoints
-- [ ] Password-change notification email (delivery mechanism may be a stub this
+- [x] Password-change notification email (delivery mechanism may be a stub this
       week; do not block the request on it)
 - [ ] Unit tests for every service in this phase
 
@@ -115,6 +115,17 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
   failures (logs, doesn't throw) so signup never blocks on SMTP — no queue
   infra (BullMQ) introduced yet for this. Revisit if/when a queue is added for
   the password-change email too.
+- Reset tokens: a random raw token (`crypto.randomBytes`) is emailed, and only
+  its SHA-256 hash is persisted to `users_auth.token` — bcrypt (used for
+  passwords) is intentionally not used here since its salting breaks the
+  `WHERE token = ?` equality lookup `db-schema.md` assumes.
+- `@Throttle()`'s per-route override values are static at decorator/import
+  time, evaluated before `ConfigModule.forRoot()` would load `.env` — so
+  `main.ts` now preloads `dotenv/config` as its first import. Needed by any
+  future route using an env-driven stricter throttle limit, not just this one.
+- The password-change notification email (next checklist line) is sent from
+  inside `resetPassword` itself, since that's the only password-change path
+  that exists yet.
 
 ## Phase 4 — Authorization
 

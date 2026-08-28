@@ -30,12 +30,20 @@ describe('AuthService', () => {
     findByEmail: ReturnType<typeof vi.fn>;
     findById: ReturnType<typeof vi.fn>;
     markVerified: ReturnType<typeof vi.fn>;
+    createPasswordResetToken: ReturnType<typeof vi.fn>;
+    findValidPasswordResetToken: ReturnType<typeof vi.fn>;
+    consumePasswordResetToken: ReturnType<typeof vi.fn>;
+    updatePassword: ReturnType<typeof vi.fn>;
   };
   let jwtService: {
     sign: ReturnType<typeof vi.fn>;
     verify: ReturnType<typeof vi.fn>;
   };
-  let mailService: { sendVerificationEmail: ReturnType<typeof vi.fn> };
+  let mailService: {
+    sendVerificationEmail: ReturnType<typeof vi.fn>;
+    sendPasswordResetEmail: ReturnType<typeof vi.fn>;
+    sendPasswordChangedEmail: ReturnType<typeof vi.fn>;
+  };
   let configService: { getOrThrow: ReturnType<typeof vi.fn> };
 
   const userRow = new UserEntity({
@@ -56,6 +64,10 @@ describe('AuthService', () => {
       findByEmail: vi.fn(),
       findById: vi.fn(),
       markVerified: vi.fn(),
+      createPasswordResetToken: vi.fn(),
+      findValidPasswordResetToken: vi.fn(),
+      consumePasswordResetToken: vi.fn(),
+      updatePassword: vi.fn(),
     };
     jwtService = {
       sign: vi.fn(),
@@ -63,6 +75,8 @@ describe('AuthService', () => {
     };
     mailService = {
       sendVerificationEmail: vi.fn(),
+      sendPasswordResetEmail: vi.fn(),
+      sendPasswordChangedEmail: vi.fn(),
     };
     configService = {
       getOrThrow: vi.fn(),
@@ -320,6 +334,183 @@ describe('AuthService', () => {
 
       expect(usersService.markVerified).toHaveBeenCalledWith(unverifiedUser.id);
       expect(usersService.markVerified).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('does nothing and resolves to undefined when no user is found', async () => {
+      usersService.findByEmail.mockResolvedValue(null);
+
+      await expect(
+        service.forgotPassword('missing@example.com'),
+      ).resolves.toBeUndefined();
+
+      expect(usersService.findByEmail).toHaveBeenCalledWith(
+        'missing@example.com',
+      );
+      expect(usersService.createPasswordResetToken).not.toHaveBeenCalled();
+      expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+
+    it('creates a hashed password-reset token with an expiry based on the configured TTL', async () => {
+      usersService.findByEmail.mockResolvedValue(userRow);
+      configService.getOrThrow.mockReturnValue(2);
+
+      const before = new Date();
+      await service.forgotPassword('jane@example.com');
+
+      expect(configService.getOrThrow).toHaveBeenCalledWith(
+        'auth.resetTokenTtlHours',
+      );
+      expect(usersService.createPasswordResetToken).toHaveBeenCalledTimes(1);
+      const [userId, hashedToken, expiresAt] = usersService
+        .createPasswordResetToken.mock.calls[0] as [string, string, Date];
+      expect(userId).toBe(userRow.id);
+      expect(typeof hashedToken).toBe('string');
+      expect(hashedToken.length).toBeGreaterThan(0);
+      expect(expiresAt).toBeInstanceOf(Date);
+      expect(expiresAt.getTime()).toBeGreaterThan(before.getTime());
+    });
+
+    it('sends the raw token to the mail service, distinct from the hashed value that was persisted', async () => {
+      usersService.findByEmail.mockResolvedValue(userRow);
+
+      await service.forgotPassword('jane@example.com');
+
+      expect(mailService.sendPasswordResetEmail).toHaveBeenCalledTimes(1);
+      const [emailArg, rawTokenArg] = mailService.sendPasswordResetEmail.mock
+        .calls[0] as [string, string];
+      expect(emailArg).toBe(userRow.email);
+      expect(typeof rawTokenArg).toBe('string');
+      expect(rawTokenArg.length).toBeGreaterThan(0);
+
+      const [, hashedToken] = usersService.createPasswordResetToken.mock
+        .calls[0] as [string, string, Date];
+      expect(rawTokenArg).not.toBe(hashedToken);
+    });
+
+    it('resolves to undefined when a user is found', async () => {
+      usersService.findByEmail.mockResolvedValue(userRow);
+
+      await expect(
+        service.forgotPassword('jane@example.com'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('generates a fresh random raw token on every call, not a fixed or reused value', async () => {
+      usersService.findByEmail.mockResolvedValue(userRow);
+
+      await service.forgotPassword('jane@example.com');
+      await service.forgotPassword('jane@example.com');
+
+      const [, firstRawToken] = mailService.sendPasswordResetEmail.mock
+        .calls[0] as [string, string];
+      const [, secondRawToken] = mailService.sendPasswordResetEmail.mock
+        .calls[1] as [string, string];
+
+      expect(firstRawToken).not.toBe(secondRawToken);
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('looks up the token via findValidPasswordResetToken with a single string argument', async () => {
+      usersService.findValidPasswordResetToken.mockResolvedValue({
+        id: 'reset-1',
+        userId: userRow.id,
+      });
+      usersService.findById.mockResolvedValue(userRow);
+
+      await service.resetPassword('raw-token', 'new-plaintext-password');
+
+      expect(usersService.findValidPasswordResetToken).toHaveBeenCalledTimes(1);
+      const [hashArg] = usersService.findValidPasswordResetToken.mock
+        .calls[0] as [string];
+      expect(typeof hashArg).toBe('string');
+    });
+
+    it('throws UnauthorizedException and does nothing else when no valid token row is found', async () => {
+      usersService.findValidPasswordResetToken.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword('bad-token', 'new-plaintext-password'),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(usersService.updatePassword).not.toHaveBeenCalled();
+      expect(usersService.consumePasswordResetToken).not.toHaveBeenCalled();
+      expect(mailService.sendPasswordChangedEmail).not.toHaveBeenCalled();
+    });
+
+    it('updates the password with the row userId and the given plaintext password', async () => {
+      usersService.findValidPasswordResetToken.mockResolvedValue({
+        id: 'reset-1',
+        userId: userRow.id,
+      });
+      usersService.findById.mockResolvedValue(userRow);
+
+      await service.resetPassword('raw-token', 'new-plaintext-password');
+
+      expect(usersService.updatePassword).toHaveBeenCalledWith(
+        userRow.id,
+        'new-plaintext-password',
+      );
+      expect(usersService.updatePassword).toHaveBeenCalledTimes(1);
+    });
+
+    it('consumes the reset token row by its id', async () => {
+      usersService.findValidPasswordResetToken.mockResolvedValue({
+        id: 'reset-1',
+        userId: userRow.id,
+      });
+      usersService.findById.mockResolvedValue(userRow);
+
+      await service.resetPassword('raw-token', 'new-plaintext-password');
+
+      expect(usersService.consumePasswordResetToken).toHaveBeenCalledWith(
+        'reset-1',
+      );
+      expect(usersService.consumePasswordResetToken).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends a password-changed notification to the user found by userId', async () => {
+      usersService.findValidPasswordResetToken.mockResolvedValue({
+        id: 'reset-1',
+        userId: userRow.id,
+      });
+      usersService.findById.mockResolvedValue(userRow);
+
+      await service.resetPassword('raw-token', 'new-plaintext-password');
+
+      expect(usersService.findById).toHaveBeenCalledWith(userRow.id);
+      expect(mailService.sendPasswordChangedEmail).toHaveBeenCalledWith(
+        userRow.email,
+      );
+      expect(mailService.sendPasswordChangedEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not throw and does not send a notification when the user is no longer found', async () => {
+      usersService.findValidPasswordResetToken.mockResolvedValue({
+        id: 'reset-1',
+        userId: userRow.id,
+      });
+      usersService.findById.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword('raw-token', 'new-plaintext-password'),
+      ).resolves.toBeUndefined();
+
+      expect(mailService.sendPasswordChangedEmail).not.toHaveBeenCalled();
+    });
+
+    it('resolves to undefined on a successful reset', async () => {
+      usersService.findValidPasswordResetToken.mockResolvedValue({
+        id: 'reset-1',
+        userId: userRow.id,
+      });
+      usersService.findById.mockResolvedValue(userRow);
+
+      await expect(
+        service.resetPassword('raw-token', 'new-plaintext-password'),
+      ).resolves.toBeUndefined();
     });
   });
 });

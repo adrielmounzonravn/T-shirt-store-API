@@ -74,4 +74,70 @@ describe('MailService', () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  describe('sendPasswordResetEmail', () => {
+    it('reads the from address from config', () => {
+      expect(configService.getOrThrow).toHaveBeenCalledWith('mailer.from');
+    });
+
+    it('sends the email to the given address from the configured from address', async () => {
+      transporter.sendMail.mockResolvedValue(undefined);
+
+      await service.sendPasswordResetEmail('jane@example.com', 'reset-token');
+
+      expect(transporter.sendMail).toHaveBeenCalledTimes(1);
+      const [options] = transporter.sendMail.mock.calls[0] as [
+        { to: string; from: string },
+      ];
+      expect(options.to).toBe('jane@example.com');
+      expect(options.from).toBe(FROM_ADDRESS);
+    });
+
+    it('includes the raw token in the email body', async () => {
+      transporter.sendMail.mockResolvedValue(undefined);
+
+      await service.sendPasswordResetEmail('jane@example.com', 'reset-token');
+
+      const [options] = transporter.sendMail.mock.calls[0] as [
+        { text?: string; html?: string },
+      ];
+      const body = `${options.text ?? ''}${options.html ?? ''}`;
+      expect(body).toContain('reset-token');
+    });
+
+    it('resolves without throwing when transporter.sendMail rejects', async () => {
+      transporter.sendMail.mockRejectedValue(new Error('SMTP unavailable'));
+
+      await expect(
+        service.sendPasswordResetEmail('jane@example.com', 'reset-token'),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('sendPasswordChangedEmail', () => {
+    it('reads the from address from config', () => {
+      expect(configService.getOrThrow).toHaveBeenCalledWith('mailer.from');
+    });
+
+    it('sends the email to the given address from the configured from address', async () => {
+      transporter.sendMail.mockResolvedValue(undefined);
+
+      await service.sendPasswordChangedEmail('jane@example.com');
+
+      expect(transporter.sendMail).toHaveBeenCalledTimes(1);
+      const [options] = transporter.sendMail.mock.calls[0] as [
+        { to: string; from: string },
+      ];
+      expect(options.to).toBe('jane@example.com');
+      expect(options.from).toBe(FROM_ADDRESS);
+    });
+
+    it('resolves without throwing when transporter.sendMail rejects', async () => {
+      transporter.sendMail.mockRejectedValue(new Error('SMTP unavailable'));
+
+      await expect(
+        service.sendPasswordChangedEmail('jane@example.com'),
+      ).resolves.toBeUndefined();
+    });
+  });
 });

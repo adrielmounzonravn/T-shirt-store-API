@@ -37,6 +37,13 @@ describe('UsersService', () => {
       findUnique: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
     };
+    userAuth: {
+      create: ReturnType<typeof vi.fn>;
+      findFirst: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+      deleteMany: ReturnType<typeof vi.fn>;
+    };
+    $transaction: ReturnType<typeof vi.fn>;
   };
   let configService: { getOrThrow: ReturnType<typeof vi.fn> };
 
@@ -62,6 +69,13 @@ describe('UsersService', () => {
         findUnique: vi.fn(),
         update: vi.fn(),
       },
+      userAuth: {
+        create: vi.fn(),
+        findFirst: vi.fn(),
+        update: vi.fn(),
+        deleteMany: vi.fn(),
+      },
+      $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
     };
     configService = {
       getOrThrow: vi.fn().mockReturnValue(SALT_ROUNDS),
@@ -250,6 +264,217 @@ describe('UsersService', () => {
       expect(result).toBeInstanceOf(UserEntity);
       expect(result).toEqual(new UserEntity(updatedRow));
       expect(result.isVerified).toBe(true);
+    });
+  });
+
+  describe('updatePassword', () => {
+    const NEW_PASSWORD = 'new-plaintext-password';
+
+    it('hashes the new password using the configured bcrypt salt rounds', async () => {
+      prisma.user.update.mockResolvedValue({
+        ...userRow,
+        password: HASHED_PASSWORD,
+      });
+
+      await service.updatePassword('user-1', NEW_PASSWORD);
+
+      expect(configService.getOrThrow).toHaveBeenCalledWith(
+        'auth.bcryptSaltRounds',
+      );
+      expect(hashMock).toHaveBeenCalledWith(NEW_PASSWORD, SALT_ROUNDS);
+    });
+
+    it('persists the hashed password, never the plaintext password', async () => {
+      prisma.user.update.mockResolvedValue({
+        ...userRow,
+        password: HASHED_PASSWORD,
+      });
+
+      await service.updatePassword('user-1', NEW_PASSWORD);
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { password: HASHED_PASSWORD },
+      });
+      expect(prisma.user.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('resolves to undefined', async () => {
+      prisma.user.update.mockResolvedValue({
+        ...userRow,
+        password: HASHED_PASSWORD,
+      });
+
+      const result = await service.updatePassword('user-1', NEW_PASSWORD);
+
+      expect(result).toBeUndefined();
+    });
+
+    it('propagates the error when prisma.user.update rejects', async () => {
+      const dbError = new Error('Record to update not found.');
+      prisma.user.update.mockRejectedValue(dbError);
+
+      await expect(
+        service.updatePassword('user-1', NEW_PASSWORD),
+      ).rejects.toThrow(dbError);
+    });
+  });
+
+  describe('createPasswordResetToken', () => {
+    const USER_ID = 'user-1';
+    const HASHED_TOKEN = 'hashed-reset-token';
+    const EXPIRES_AT = new Date('2024-06-01T00:00:00.000Z');
+
+    it('deletes previously unused reset tokens for the user and creates the new one atomically', async () => {
+      prisma.userAuth.deleteMany.mockResolvedValue({ count: 1 });
+      prisma.userAuth.create.mockResolvedValue({
+        id: 'auth-1',
+        userId: USER_ID,
+        token: HASHED_TOKEN,
+        usedAt: null,
+        expiresAt: EXPIRES_AT,
+      });
+
+      await service.createPasswordResetToken(USER_ID, HASHED_TOKEN, EXPIRES_AT);
+
+      expect(prisma.userAuth.deleteMany).toHaveBeenCalledWith({
+        where: { userId: USER_ID, usedAt: null },
+      });
+      expect(prisma.userAuth.create).toHaveBeenCalledWith({
+        data: {
+          userId: USER_ID,
+          token: HASHED_TOKEN,
+          expiresAt: EXPIRES_AT,
+        },
+      });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const [ops] = prisma.$transaction.mock.calls[0] as [unknown[]];
+      expect(ops).toHaveLength(2);
+    });
+
+    it('resolves to undefined', async () => {
+      prisma.userAuth.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.userAuth.create.mockResolvedValue({
+        id: 'auth-1',
+        userId: USER_ID,
+        token: HASHED_TOKEN,
+        usedAt: null,
+        expiresAt: EXPIRES_AT,
+      });
+
+      const result = await service.createPasswordResetToken(
+        USER_ID,
+        HASHED_TOKEN,
+        EXPIRES_AT,
+      );
+
+      expect(result).toBeUndefined();
+    });
+
+    it('does not hash the token itself (the caller is responsible for hashing)', async () => {
+      prisma.userAuth.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.userAuth.create.mockResolvedValue({
+        id: 'auth-1',
+        userId: USER_ID,
+        token: HASHED_TOKEN,
+        usedAt: null,
+        expiresAt: EXPIRES_AT,
+      });
+      hashMock.mockClear();
+
+      await service.createPasswordResetToken(USER_ID, HASHED_TOKEN, EXPIRES_AT);
+
+      expect(hashMock).not.toHaveBeenCalled();
+    });
+
+    it('propagates the error when the transaction rejects', async () => {
+      const dbError = new Error('Transaction failed');
+      prisma.userAuth.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.userAuth.create.mockResolvedValue({});
+      prisma.$transaction.mockRejectedValue(dbError);
+
+      await expect(
+        service.createPasswordResetToken(USER_ID, HASHED_TOKEN, EXPIRES_AT),
+      ).rejects.toThrow(dbError);
+    });
+  });
+
+  describe('findValidPasswordResetToken', () => {
+    const HASHED_TOKEN = 'hashed-reset-token';
+
+    it('calls prisma.userAuth.findFirst with the exact where/select shape', async () => {
+      prisma.userAuth.findFirst.mockResolvedValue({
+        id: 'auth-1',
+        userId: 'user-1',
+      });
+
+      await service.findValidPasswordResetToken(HASHED_TOKEN);
+
+      expect(prisma.userAuth.findFirst).toHaveBeenCalledWith({
+        where: {
+          token: HASHED_TOKEN,
+          usedAt: null,
+          expiresAt: { gt: expect.any(Date) as Date },
+        },
+        select: { id: true, userId: true },
+      });
+      expect(prisma.userAuth.findFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it('resolves to the row when a valid token is found', async () => {
+      const row = { id: 'auth-1', userId: 'user-1' };
+      prisma.userAuth.findFirst.mockResolvedValue(row);
+
+      const result = await service.findValidPasswordResetToken(HASHED_TOKEN);
+
+      expect(result).toEqual(row);
+    });
+
+    it('resolves to null when no valid token is found', async () => {
+      prisma.userAuth.findFirst.mockResolvedValue(null);
+
+      const result = await service.findValidPasswordResetToken(HASHED_TOKEN);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('consumePasswordResetToken', () => {
+    it('calls prisma.userAuth.update with the exact where shape and a Date usedAt', async () => {
+      prisma.userAuth.update.mockResolvedValue({
+        id: 'auth-1',
+        userId: 'user-1',
+        usedAt: new Date(),
+      });
+
+      await service.consumePasswordResetToken('auth-1');
+
+      expect(prisma.userAuth.update).toHaveBeenCalledWith({
+        where: { id: 'auth-1' },
+        data: { usedAt: expect.any(Date) as Date },
+      });
+      expect(prisma.userAuth.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('resolves to undefined', async () => {
+      prisma.userAuth.update.mockResolvedValue({
+        id: 'auth-1',
+        userId: 'user-1',
+        usedAt: new Date(),
+      });
+
+      const result = await service.consumePasswordResetToken('auth-1');
+
+      expect(result).toBeUndefined();
+    });
+
+    it('propagates the error when prisma.userAuth.update rejects', async () => {
+      const dbError = new Error('Record to update not found.');
+      prisma.userAuth.update.mockRejectedValue(dbError);
+
+      await expect(service.consumePasswordResetToken('auth-1')).rejects.toThrow(
+        dbError,
+      );
     });
   });
 });
