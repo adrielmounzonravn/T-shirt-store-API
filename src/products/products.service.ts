@@ -28,6 +28,7 @@ export class ProductsService {
         variants: {
           some: {
             deletedAt: null,
+            ...(!isManager && { status: ProductStatus.enabled }),
             ...(gender && { gender }),
             ...(size && { size }),
             ...(fit && { fit }),
@@ -65,7 +66,13 @@ export class ProductsService {
       },
       include: {
         images: true,
-        variants: { where: { deletedAt: null }, include: { images: true } },
+        variants: {
+          where: {
+            deletedAt: null,
+            ...(!isManager && { status: ProductStatus.enabled }),
+          },
+          include: { images: true },
+        },
       },
     });
 

@@ -142,8 +142,8 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - [x] Detail, with a response shape that does not force one request per row
 - [x] Create (with the optional atomic `variants[]`), update, soft delete
 - [x] Enable / disable
-- [ ] Soft-delete and sellability rules applied on every read
-- [ ] Unit tests for the service
+- [x] Soft-delete and sellability rules applied on every read
+- [x] Unit tests for the service
 
 **Notes:**
 
@@ -161,6 +161,11 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
   `disabled` products; everyone else is clamped to `status: enabled`
   regardless of the query param — enforced in `ProductsService`, not CASL
   (role-shaped check, not ownership-shaped).
+- Sellability AND (`db-schema.md`): for non-Manager reads, `variant.status:
+  enabled` is now also required — in `findMany`'s category filter
+  (`variants.some`) and in `findOne`'s `variants` include — on top of the
+  existing `deletedAt: null` filtering. Manager keeps seeing disabled variants
+  (soft-deleted only excluded), same exemption pattern as product `status`.
 - Found and fixed a pre-existing bug (unrelated to Products, present since
   Phase 3): `AuthModule` imported bare `PassportModule` instead of
   `PassportModule.register({})`, so `AuthModuleOptions` was never provided and

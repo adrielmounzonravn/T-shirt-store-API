@@ -259,6 +259,33 @@ describe('ProductsService', () => {
       expect(findManyWhere.variants.some).toMatchObject({ fit: 'oversize' });
       expect(countWhere.variants.some).toMatchObject({ fit: 'oversize' });
     });
+
+    it('requires variant status enabled for an anonymous caller using a category filter', async () => {
+      await service.findMany({ ...baseQuery, gender: 'men' }, undefined);
+
+      const where = getFindManyWhere() as {
+        variants: { some: Record<string, unknown> };
+      };
+      expect(where.variants.some).toMatchObject({ status: 'enabled' });
+    });
+
+    it('requires variant status enabled for a client caller using a category filter', async () => {
+      await service.findMany({ ...baseQuery, gender: 'men' }, clientUser);
+
+      const where = getFindManyWhere() as {
+        variants: { some: Record<string, unknown> };
+      };
+      expect(where.variants.some).toMatchObject({ status: 'enabled' });
+    });
+
+    it('does not restrict variant status for a manager caller using a category filter', async () => {
+      await service.findMany({ ...baseQuery, gender: 'men' }, managerUser);
+
+      const where = getFindManyWhere() as {
+        variants: { some: Record<string, unknown> };
+      };
+      expect(where.variants.some.status).not.toBe('enabled');
+    });
   });
 
   describe('pagination', () => {
@@ -435,6 +462,30 @@ describe('ProductsService', () => {
         await service.findOne('product-1', managerUser);
 
         expect(getVariantsWhere()).toMatchObject({ deletedAt: null });
+      });
+
+      it('requires variant status enabled in the query, for an anonymous caller', async () => {
+        prisma.product.findFirst.mockResolvedValue(productDetailRow);
+
+        await service.findOne('product-1', undefined);
+
+        expect(getVariantsWhere()).toMatchObject({ status: 'enabled' });
+      });
+
+      it('requires variant status enabled in the query, for a client caller', async () => {
+        prisma.product.findFirst.mockResolvedValue(productDetailRow);
+
+        await service.findOne('product-1', clientUser);
+
+        expect(getVariantsWhere()).toMatchObject({ status: 'enabled' });
+      });
+
+      it('does not restrict variant status in the query, for a manager caller', async () => {
+        prisma.product.findFirst.mockResolvedValue(productDetailRow);
+
+        await service.findOne('product-1', managerUser);
+
+        expect(getVariantsWhere()?.status).not.toBe('enabled');
       });
     });
 
