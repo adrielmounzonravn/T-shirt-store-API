@@ -24,13 +24,9 @@ export class StorageService {
     prefix: 'products' | 'variants',
     parentId: string,
     imageId: string,
-    originalFilename: string,
     mimetype: string,
   ): string {
-    const extension =
-      this.extractExtension(originalFilename) ??
-      EXTENSION_BY_MIMETYPE[mimetype] ??
-      'bin';
+    const extension = EXTENSION_BY_MIMETYPE[mimetype] ?? 'bin';
 
     return `${prefix}/${parentId}/${imageId}.${extension}`;
   }
@@ -53,15 +49,5 @@ export class StorageService {
         Key: key,
       }),
     );
-  }
-
-  private extractExtension(filename: string): string | undefined {
-    const lastDot = filename.lastIndexOf('.');
-
-    if (lastDot === -1 || lastDot === filename.length - 1) {
-      return undefined;
-    }
-
-    return filename.slice(lastDot + 1).toLowerCase();
   }
 }
