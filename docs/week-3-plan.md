@@ -130,7 +130,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 ## Phase 4 — Authorization
 
 - [x] Role decorator + guard (Manager-only endpoints)
-- [ ] CASL ability factory (all rules live here) + policies guard
+- [x] CASL ability factory (all rules live here) + policies guard
 - [ ] Current-user decorator, guard order verified on a protected route
 - [ ] Unit tests for the ability factory and the guards
 

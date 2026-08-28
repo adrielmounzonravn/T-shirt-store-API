@@ -1,0 +1,96 @@
+import { describe, it, expect } from 'vitest';
+import { CaslAbilityFactory } from './casl-ability.factory.js';
+import { Role } from '../generated/prisma/enums.js';
+
+describe('CaslAbilityFactory', () => {
+  describe('manager', () => {
+    it('can manage/create/read/update/delete Product', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: Role.manager,
+      });
+
+      expect(ability.can('manage', 'Product')).toBe(true);
+      expect(ability.can('create', 'Product')).toBe(true);
+      expect(ability.can('read', 'Product')).toBe(true);
+      expect(ability.can('update', 'Product')).toBe(true);
+      expect(ability.can('delete', 'Product')).toBe(true);
+    });
+
+    it('can manage/create/read/update/delete ProductVariant', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: Role.manager,
+      });
+
+      expect(ability.can('manage', 'ProductVariant')).toBe(true);
+      expect(ability.can('create', 'ProductVariant')).toBe(true);
+      expect(ability.can('read', 'ProductVariant')).toBe(true);
+      expect(ability.can('update', 'ProductVariant')).toBe(true);
+      expect(ability.can('delete', 'ProductVariant')).toBe(true);
+    });
+  });
+
+  describe('client', () => {
+    it('can only read Product', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-2',
+        role: Role.client,
+      });
+
+      expect(ability.can('read', 'Product')).toBe(true);
+      expect(ability.cannot('create', 'Product')).toBe(true);
+      expect(ability.cannot('update', 'Product')).toBe(true);
+      expect(ability.cannot('delete', 'Product')).toBe(true);
+      expect(ability.cannot('manage', 'Product')).toBe(true);
+    });
+
+    it('can only read ProductVariant', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-2',
+        role: Role.client,
+      });
+
+      expect(ability.can('read', 'ProductVariant')).toBe(true);
+      expect(ability.cannot('create', 'ProductVariant')).toBe(true);
+      expect(ability.cannot('update', 'ProductVariant')).toBe(true);
+      expect(ability.cannot('delete', 'ProductVariant')).toBe(true);
+      expect(ability.cannot('manage', 'ProductVariant')).toBe(true);
+    });
+  });
+
+  it('returns independent ability instances that do not leak permissions between users', () => {
+    const factory = new CaslAbilityFactory();
+
+    const managerAbility = factory.createForUser({
+      id: 'manager-1',
+      role: Role.manager,
+    });
+    const clientAbility = factory.createForUser({
+      id: 'client-1',
+      role: Role.client,
+    });
+
+    expect(managerAbility.can('delete', 'Product')).toBe(true);
+    expect(clientAbility.cannot('delete', 'Product')).toBe(true);
+    expect(clientAbility.cannot('create', 'ProductVariant')).toBe(true);
+
+    // building the client ability after the manager one must not retroactively
+    // change what the manager instance is allowed to do
+    expect(managerAbility.can('delete', 'Product')).toBe(true);
+    expect(managerAbility.can('create', 'ProductVariant')).toBe(true);
+  });
+
+  it('builds a real CASL Ability instance exposing can/cannot/rules', () => {
+    const factory = new CaslAbilityFactory();
+    const ability = factory.createForUser({ id: 'user-3', role: Role.client });
+
+    expect(typeof ability.can).toBe('function');
+    expect(typeof ability.cannot).toBe('function');
+    expect(Array.isArray(ability.rules)).toBe(true);
+  });
+});
