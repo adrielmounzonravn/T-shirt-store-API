@@ -13,6 +13,7 @@ import type { Request } from 'express';
 import { AuthService } from './auth.service.js';
 import { SignUpDto } from './dto/signup.dto.js';
 import { SignInDto } from './dto/signin.dto.js';
+import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { LocalAuthGuard } from './guards/local-auth.guard.js';
 import { UserEntity } from '../users/entities/user.entity.js';
 
@@ -35,5 +36,11 @@ export class AuthController {
     @Req() req: Request,
   ): { accessToken: string } {
     return this.authService.signIn(req.user as UserEntity);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
+    await this.authService.verifyEmail(dto.token);
   }
 }

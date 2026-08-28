@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Test } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service.js';
 import { UsersService } from '../users/users.service.js';
+import { MailService } from '../mail/mail.service.js';
 import { UserEntity } from '../users/entities/user.entity.js';
 import { Role } from '../generated/prisma/enums.js';
 
@@ -26,8 +28,15 @@ describe('AuthService', () => {
   let usersService: {
     create: ReturnType<typeof vi.fn>;
     findByEmail: ReturnType<typeof vi.fn>;
+    findById: ReturnType<typeof vi.fn>;
+    markVerified: ReturnType<typeof vi.fn>;
   };
-  let jwtService: { sign: ReturnType<typeof vi.fn> };
+  let jwtService: {
+    sign: ReturnType<typeof vi.fn>;
+    verify: ReturnType<typeof vi.fn>;
+  };
+  let mailService: { sendVerificationEmail: ReturnType<typeof vi.fn> };
+  let configService: { getOrThrow: ReturnType<typeof vi.fn> };
 
   const userRow = new UserEntity({
     id: 'user-1',
@@ -45,18 +54,38 @@ describe('AuthService', () => {
     usersService = {
       create: vi.fn(),
       findByEmail: vi.fn(),
+      findById: vi.fn(),
+      markVerified: vi.fn(),
     };
     jwtService = {
       sign: vi.fn(),
+      verify: vi.fn(),
     };
+    mailService = {
+      sendVerificationEmail: vi.fn(),
+    };
+    configService = {
+      getOrThrow: vi.fn(),
+    };
+    configService.getOrThrow.mockReturnValue(24);
 
     const moduleRef = await Test.createTestingModule({
-      providers: [AuthService, UsersService, JwtService],
+      providers: [
+        AuthService,
+        UsersService,
+        JwtService,
+        MailService,
+        ConfigService,
+      ],
     })
       .overrideProvider(UsersService)
       .useValue(usersService)
       .overrideProvider(JwtService)
       .useValue(jwtService)
+      .overrideProvider(MailService)
+      .useValue(mailService)
+      .overrideProvider(ConfigService)
+      .useValue(configService)
       .compile();
 
     service = moduleRef.get(AuthService);
@@ -97,6 +126,49 @@ describe('AuthService', () => {
       usersService.create.mockRejectedValue(error);
 
       await expect(service.signUp(input)).rejects.toThrow(error);
+    });
+
+    it('signs an email-verification JWT for the newly created user', async () => {
+      usersService.create.mockResolvedValue(userRow);
+      jwtService.sign.mockReturnValue('signed-verification-token');
+
+      await service.signUp(input);
+
+      expect(configService.getOrThrow).toHaveBeenCalledWith(
+        'auth.emailVerificationTokenTtlHours',
+      );
+      expect(jwtService.sign).toHaveBeenCalledTimes(1);
+      const [payload, options] = jwtService.sign.mock.calls[0] as [
+        Record<string, unknown>,
+        { expiresIn: number },
+      ];
+      expect(payload).toEqual({
+        sub: userRow.id,
+        purpose: 'email-verification',
+      });
+      expect(typeof options.expiresIn).toBe('number');
+    });
+
+    it('sends a verification email to the new user with the signed token', async () => {
+      usersService.create.mockResolvedValue(userRow);
+      jwtService.sign.mockReturnValue('signed-verification-token');
+
+      await service.signUp(input);
+
+      expect(mailService.sendVerificationEmail).toHaveBeenCalledWith(
+        userRow.email,
+        'signed-verification-token',
+      );
+      expect(mailService.sendVerificationEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('still resolves to the created UserEntity despite the extra side effects', async () => {
+      usersService.create.mockResolvedValue(userRow);
+      jwtService.sign.mockReturnValue('signed-verification-token');
+
+      const result = await service.signUp(input);
+
+      expect(result).toBe(userRow);
     });
   });
 
@@ -176,6 +248,78 @@ describe('AuthService', () => {
 
       expect(() => service.signIn(unverifiedUser)).toThrow(ForbiddenException);
       expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('throws UnauthorizedException and never looks up the user when jwtService.verify throws', async () => {
+      jwtService.verify.mockImplementation(() => {
+        throw new Error('jwt expired');
+      });
+
+      await expect(service.verifyEmail('bad-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(usersService.findById).not.toHaveBeenCalled();
+    });
+
+    it('throws UnauthorizedException and never looks up the user when the payload purpose is wrong', async () => {
+      jwtService.verify.mockReturnValue({
+        sub: userRow.id,
+        purpose: 'password-reset',
+      });
+
+      await expect(service.verifyEmail('wrong-purpose-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(usersService.findById).not.toHaveBeenCalled();
+    });
+
+    it('throws UnauthorizedException and never marks verified when no user is found', async () => {
+      jwtService.verify.mockReturnValue({
+        sub: 'missing-user',
+        purpose: 'email-verification',
+      });
+      usersService.findById.mockResolvedValue(null);
+
+      await expect(service.verifyEmail('valid-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(usersService.findById).toHaveBeenCalledWith('missing-user');
+      expect(usersService.markVerified).not.toHaveBeenCalled();
+    });
+
+    it('throws UnauthorizedException and never marks verified when the user is already verified', async () => {
+      jwtService.verify.mockReturnValue({
+        sub: userRow.id,
+        purpose: 'email-verification',
+      });
+      usersService.findById.mockResolvedValue(userRow);
+
+      await expect(service.verifyEmail('valid-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(usersService.markVerified).not.toHaveBeenCalled();
+    });
+
+    it('marks the user verified when the token is valid and the user is not yet verified', async () => {
+      const unverifiedUser = new UserEntity({
+        ...userRow,
+        isVerified: false,
+      });
+      jwtService.verify.mockReturnValue({
+        sub: unverifiedUser.id,
+        purpose: 'email-verification',
+      });
+      usersService.findById.mockResolvedValue(unverifiedUser);
+      usersService.markVerified.mockResolvedValue(
+        new UserEntity({ ...unverifiedUser, isVerified: true }),
+      );
+
+      await expect(service.verifyEmail('valid-token')).resolves.toBeUndefined();
+
+      expect(usersService.markVerified).toHaveBeenCalledWith(unverifiedUser.id);
+      expect(usersService.markVerified).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -96,7 +96,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 - [x] Users module (lookup + creation, password hashing)
 - [x] Sign up, sign in (Passport local + JWT strategy)
-- [ ] Email verification endpoint
+- [x] Email verification endpoint
 - [ ] Forgot password / reset password with tokens, plus the stricter rate limit
       on those endpoints
 - [ ] Password-change notification email (delivery mechanism may be a stub this
@@ -104,6 +104,17 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - [ ] Unit tests for every service in this phase
 
 **Notes:**
+
+- Email verification uses a short-lived, stateless JWT (`{ sub, purpose:
+  'email-verification' }`, TTL from `EMAIL_VERIFICATION_TOKEN_TTL_HOURS`) —
+  not `users_auth`, which stays reserved for password-reset tokens only per
+  `db-schema.md`. It's verified by signature + expiry, no DB round-trip; a
+  used token is rejected because `verifyEmail` checks `user.isVerified` and
+  401s if already true, so it never needs its own single-use tracking.
+- `MailService` (new `src/mail/` module, wraps `nodemailer`) swallows send
+  failures (logs, doesn't throw) so signup never blocks on SMTP — no queue
+  infra (BullMQ) introduced yet for this. Revisit if/when a queue is added for
+  the password-change email too.
 
 ## Phase 4 — Authorization
 

@@ -43,4 +43,12 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     return user ? new UserEntity(user) : null;
   }
+
+  async markVerified(id: string): Promise<UserEntity> {
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: { isVerified: true },
+    });
+    return new UserEntity(user);
+  }
 }

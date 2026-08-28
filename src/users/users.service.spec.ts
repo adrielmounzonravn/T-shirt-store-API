@@ -35,6 +35,7 @@ describe('UsersService', () => {
     user: {
       create: ReturnType<typeof vi.fn>;
       findUnique: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
     };
   };
   let configService: { getOrThrow: ReturnType<typeof vi.fn> };
@@ -59,6 +60,7 @@ describe('UsersService', () => {
       user: {
         create: vi.fn(),
         findUnique: vi.fn(),
+        update: vi.fn(),
       },
     };
     configService = {
@@ -223,6 +225,31 @@ describe('UsersService', () => {
       const result = await service.findById('missing-id');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('markVerified', () => {
+    it('calls prisma.user.update with the exact where/data shape', async () => {
+      prisma.user.update.mockResolvedValue({ ...userRow, isVerified: true });
+
+      await service.markVerified('user-1');
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { isVerified: true },
+      });
+      expect(prisma.user.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('resolves to a UserEntity reflecting isVerified: true', async () => {
+      const updatedRow = { ...userRow, isVerified: true };
+      prisma.user.update.mockResolvedValue(updatedRow);
+
+      const result = await service.markVerified('user-1');
+
+      expect(result).toBeInstanceOf(UserEntity);
+      expect(result).toEqual(new UserEntity(updatedRow));
+      expect(result.isVerified).toBe(true);
     });
   });
 });
