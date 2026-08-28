@@ -12,6 +12,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CaslModule } from './casl/casl.module.js';
+import { ProductsModule } from './products/products.module.js';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { CaslModule } from './casl/casl.module.js';
     UsersModule,
     AuthModule,
     CaslModule,
+    ProductsModule,
   ],
   controllers: [AppController],
   providers: [
