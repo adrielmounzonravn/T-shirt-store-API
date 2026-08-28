@@ -51,4 +51,51 @@ export class UsersService {
     });
     return new UserEntity(user);
   }
+
+  async updatePassword(id: string, newPassword: string): Promise<void> {
+    const saltRounds = this.configService.getOrThrow<number>(
+      'auth.bcryptSaltRounds',
+    );
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    await this.prisma.user.update({
+      where: { id },
+      data: { password: hashedPassword },
+    });
+  }
+
+  async createPasswordResetToken(
+    userId: string,
+    hashedToken: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.userAuth.deleteMany({
+        where: { userId, usedAt: null },
+      }),
+      this.prisma.userAuth.create({
+        data: { userId, token: hashedToken, expiresAt },
+      }),
+    ]);
+  }
+
+  async findValidPasswordResetToken(
+    hashedToken: string,
+  ): Promise<{ id: string; userId: string } | null> {
+    return this.prisma.userAuth.findFirst({
+      where: {
+        token: hashedToken,
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: { id: true, userId: true },
+    });
+  }
+
+  async consumePasswordResetToken(id: string): Promise<void> {
+    await this.prisma.userAuth.update({
+      where: { id },
+      data: { usedAt: new Date() },
+    });
+  }
 }

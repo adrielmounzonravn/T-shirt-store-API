@@ -32,6 +32,38 @@ export class MailService {
       );
     }
   }
+
+  async sendPasswordResetEmail(email: string, token: string): Promise<void> {
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to: email,
+        subject: 'Reset your password',
+        text: `Use this token to reset your password: ${token}`,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password reset email to ${email}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
+  }
+
+  async sendPasswordChangedEmail(email: string): Promise<void> {
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to: email,
+        subject: 'Your password was changed',
+        text: 'Your password was just changed. If this was not you, contact support immediately.',
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password-changed notification to ${email}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
+  }
 }
 
 export function createMailTransport(configService: ConfigService) {

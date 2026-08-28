@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { createHash, randomBytes } from 'node:crypto';
 import { CreateUserInput, UsersService } from '../users/users.service.js';
 import { UserEntity } from '../users/entities/user.entity.js';
 import { MailService } from '../mail/mail.service.js';
@@ -83,5 +84,48 @@ export class AuthService {
 
     const payload: JwtPayload = { sub: user.id, role: user.role };
     return { accessToken: this.jwtService.sign(payload) };
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      return;
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const ttlHours = this.configService.getOrThrow<number>(
+      'auth.resetTokenTtlHours',
+    );
+    const expiresAt = new Date(Date.now() + ttlHours * 3600 * 1000);
+
+    await this.usersService.createPasswordResetToken(
+      user.id,
+      this.hashResetToken(rawToken),
+      expiresAt,
+    );
+    await this.mailService.sendPasswordResetEmail(user.email, rawToken);
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const resetToken = await this.usersService.findValidPasswordResetToken(
+      this.hashResetToken(token),
+    );
+    if (!resetToken) {
+      throw new UnauthorizedException(
+        'Invalid, expired, or already used token',
+      );
+    }
+
+    await this.usersService.updatePassword(resetToken.userId, newPassword);
+    await this.usersService.consumePasswordResetToken(resetToken.id);
+
+    const user = await this.usersService.findById(resetToken.userId);
+    if (user) {
+      await this.mailService.sendPasswordChangedEmail(user.email);
+    }
+  }
+
+  private hashResetToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 }
