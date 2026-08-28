@@ -120,6 +120,29 @@ export class ProductsService {
     });
   }
 
+  async enable(id: string): Promise<ProductEntity> {
+    return this.setStatus(id, ProductStatus.enabled);
+  }
+
+  async disable(id: string): Promise<ProductEntity> {
+    return this.setStatus(id, ProductStatus.disabled);
+  }
+
+  private async setStatus(
+    id: string,
+    status: ProductStatus,
+  ): Promise<ProductEntity> {
+    await this.assertActiveProduct(id);
+
+    const product = await this.prisma.product.update({
+      where: { id },
+      data: { status },
+      include: { images: true },
+    });
+
+    return new ProductEntity(product);
+  }
+
   private async assertActiveProduct(id: string): Promise<void> {
     const product = await this.prisma.product.findFirst({
       where: { id, deletedAt: null },

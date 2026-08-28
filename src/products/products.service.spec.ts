@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import type { ListProductsQueryDto } from './dto/list-products-query.dto.js';
 import type { CreateProductDto } from './dto/create-product.dto.js';
 import type { JwtPayload } from '../auth/jwt-payload.interface.js';
-import { Role } from '../generated/prisma/enums.js';
+import { ProductStatus, Role } from '../generated/prisma/enums.js';
 
 describe('ProductsService', () => {
   let service: ProductsService;
@@ -777,6 +777,122 @@ describe('ProductsService', () => {
       );
       expect(prisma.product.update).not.toHaveBeenCalled();
       expect(prisma.product.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('enable', () => {
+    const getUpdateArgs = () =>
+      (
+        prisma.product.update.mock.calls[0] as [
+          { where?: Record<string, unknown>; data?: Record<string, unknown> },
+        ]
+      )[0];
+
+    it('sets status to enabled via update, keyed by id', async () => {
+      prisma.product.findFirst.mockResolvedValue(productRow);
+      prisma.product.update.mockResolvedValue({
+        ...productRow,
+        status: 'enabled',
+      });
+
+      await service.enable('product-1');
+
+      expect(getUpdateArgs().where).toMatchObject({ id: 'product-1' });
+      expect(getUpdateArgs().data).toMatchObject({
+        status: ProductStatus.enabled,
+      });
+    });
+
+    it('returns a ProductEntity reflecting the enabled product', async () => {
+      prisma.product.findFirst.mockResolvedValue(productRow);
+      prisma.product.update.mockResolvedValue({
+        ...productRow,
+        status: 'enabled',
+      });
+
+      const result = await service.enable('product-1');
+
+      expect(result).toMatchObject({
+        id: 'product-1',
+        status: 'enabled',
+        images: [expect.objectContaining(image)],
+      });
+    });
+
+    it('throws NotFoundException when no active product with that id exists', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(service.enable('missing-product')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.product.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for a soft-deleted product', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(service.enable('product-1')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.product.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('disable', () => {
+    const getUpdateArgs = () =>
+      (
+        prisma.product.update.mock.calls[0] as [
+          { where?: Record<string, unknown>; data?: Record<string, unknown> },
+        ]
+      )[0];
+
+    it('sets status to disabled via update, keyed by id', async () => {
+      prisma.product.findFirst.mockResolvedValue(productRow);
+      prisma.product.update.mockResolvedValue({
+        ...productRow,
+        status: 'disabled',
+      });
+
+      await service.disable('product-1');
+
+      expect(getUpdateArgs().where).toMatchObject({ id: 'product-1' });
+      expect(getUpdateArgs().data).toMatchObject({
+        status: ProductStatus.disabled,
+      });
+    });
+
+    it('returns a ProductEntity reflecting the disabled product', async () => {
+      prisma.product.findFirst.mockResolvedValue(productRow);
+      prisma.product.update.mockResolvedValue({
+        ...productRow,
+        status: 'disabled',
+      });
+
+      const result = await service.disable('product-1');
+
+      expect(result).toMatchObject({
+        id: 'product-1',
+        status: 'disabled',
+        images: [expect.objectContaining(image)],
+      });
+    });
+
+    it('throws NotFoundException when no active product with that id exists', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(service.disable('missing-product')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.product.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for a soft-deleted product', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(service.disable('product-1')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.product.update).not.toHaveBeenCalled();
     });
   });
 });

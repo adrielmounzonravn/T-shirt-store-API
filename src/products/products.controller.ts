@@ -72,4 +72,18 @@ export class ProductsController {
   remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.productsService.remove(id);
   }
+
+  @Patch(':id/enable')
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies((ability) => ability.can('update', 'Product'))
+  enable(@Param('id', ParseUUIDPipe) id: string): Promise<ProductEntity> {
+    return this.productsService.enable(id);
+  }
+
+  @Patch(':id/disable')
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies((ability) => ability.can('update', 'Product'))
+  disable(@Param('id', ParseUUIDPipe) id: string): Promise<ProductEntity> {
+    return this.productsService.disable(id);
+  }
 }
