@@ -186,7 +186,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 ## Phase 6 — SKUs / variants
 
-- [ ] List and create under a product
+- [x] List and create under a product
 - [ ] Detail, update, soft delete
 - [ ] Enable / disable
 - [ ] Sellability as an AND across product + variant
