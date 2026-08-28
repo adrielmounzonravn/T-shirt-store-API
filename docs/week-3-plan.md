@@ -139,7 +139,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 ## Phase 5 — Products
 
 - [x] List with pagination + category search, public (logged and non-logged)
-- [ ] Detail, with a response shape that does not force one request per row
+- [x] Detail, with a response shape that does not force one request per row
 - [ ] Create (with the optional atomic `variants[]`), update, soft delete
 - [ ] Enable / disable
 - [ ] Soft-delete and sellability rules applied on every read
@@ -172,6 +172,12 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 - "Category" has no dedicated entity — `gender`/`size`/`fit`/`color` filter on
   the product's non-soft-deleted `variants` via a Prisma `variants.some(...)`
   relation filter, per `openapi.yaml`'s description on `GET /products`.
+- `GET /products/{productId}` (`security: []` in `openapi.yaml`, no visibility
+  restriction spelled out there) applies the same Manager-only `disabled`
+  visibility as the list endpoint for consistency: a non-Manager fetching a
+  `disabled` product's detail gets 404, not the product. One query via
+  `findFirst` with `include: { images, variants: { where, include: images } }`
+  covers product + variants + both images arrays.
 
 ## Phase 6 — SKUs / variants
 

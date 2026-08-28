@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Test } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { ProductsService } from './products.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ListProductsQueryDto } from './dto/list-products-query.dto.js';
 import type { JwtPayload } from '../auth/jwt-payload.interface.js';
+import { Role } from '../generated/prisma/enums.js';
 
 describe('ProductsService', () => {
   let service: ProductsService;
@@ -11,11 +13,12 @@ describe('ProductsService', () => {
     product: {
       findMany: ReturnType<typeof vi.fn>;
       count: ReturnType<typeof vi.fn>;
+      findFirst: ReturnType<typeof vi.fn>;
     };
   };
 
-  const managerUser: JwtPayload = { sub: 'user-1', role: 'manager' };
-  const clientUser: JwtPayload = { sub: 'user-2', role: 'client' };
+  const managerUser: JwtPayload = { sub: 'user-1', role: Role.manager };
+  const clientUser: JwtPayload = { sub: 'user-2', role: Role.client };
 
   const image = {
     id: 'image-1',
@@ -40,6 +43,36 @@ describe('ProductsService', () => {
     offset: 0,
   };
 
+  const variantImage = {
+    id: 'variant-image-1',
+    variantId: 'variant-1',
+    imagePath: '/images/variant-1.jpg',
+    isCover: true,
+    createdAt: new Date('2024-01-01T00:00:00.000Z'),
+  };
+
+  const variantRow = {
+    id: 'variant-1',
+    productId: 'product-1',
+    size: 'm',
+    color: 'black',
+    fit: 'regular',
+    gender: 'men',
+    stock: 10,
+    price: '29.99',
+    status: 'enabled',
+    images: [variantImage],
+    deletedAt: null,
+    createdAt: new Date('2024-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2024-01-02T00:00:00.000Z'),
+  };
+
+  const productDetailRow = {
+    ...productRow,
+    deletedAt: null,
+    variants: [variantRow],
+  };
+
   const setupService = async () => {
     const moduleRef = await Test.createTestingModule({
       providers: [ProductsService, PrismaService],
@@ -56,10 +89,12 @@ describe('ProductsService', () => {
       product: {
         findMany: vi.fn(),
         count: vi.fn(),
+        findFirst: vi.fn(),
       },
     };
     prisma.product.findMany.mockResolvedValue([productRow]);
     prisma.product.count.mockResolvedValue(1);
+    prisma.product.findFirst.mockResolvedValue(null);
 
     service = await setupService();
   });
@@ -301,6 +336,197 @@ describe('ProductsService', () => {
           offset: baseQuery.offset,
           total: 0,
         },
+      });
+    });
+  });
+
+  describe('findOne', () => {
+    const getFindFirstArgs = () =>
+      (
+        prisma.product.findFirst.mock.calls[0] as [
+          {
+            where?: Record<string, unknown>;
+            include?: Record<string, unknown>;
+          },
+        ]
+      )[0];
+
+    describe('soft-delete filtering', () => {
+      it('throws NotFoundException when the product row does not exist', async () => {
+        prisma.product.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.findOne('missing-product', undefined),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('throws NotFoundException when the product is soft-deleted, for an anonymous caller', async () => {
+        prisma.product.findFirst.mockResolvedValue(null);
+
+        await expect(service.findOne('product-1', undefined)).rejects.toThrow(
+          NotFoundException,
+        );
+      });
+
+      it('throws NotFoundException when the product is soft-deleted, for a client caller', async () => {
+        prisma.product.findFirst.mockResolvedValue(null);
+
+        await expect(service.findOne('product-1', clientUser)).rejects.toThrow(
+          NotFoundException,
+        );
+      });
+
+      it('throws NotFoundException when the product is soft-deleted, even for a manager caller', async () => {
+        prisma.product.findFirst.mockResolvedValue(null);
+
+        await expect(service.findOne('product-1', managerUser)).rejects.toThrow(
+          NotFoundException,
+        );
+      });
+
+      it('filters on deletedAt: null in the findFirst where clause', async () => {
+        prisma.product.findFirst.mockResolvedValue(productDetailRow);
+
+        await service.findOne('product-1', managerUser);
+
+        expect(getFindFirstArgs().where).toMatchObject({
+          id: 'product-1',
+          deletedAt: null,
+        });
+      });
+    });
+
+    describe('variant soft-delete filtering', () => {
+      const getVariantsWhere = () => {
+        const args = getFindFirstArgs();
+        const variantsInclude = args.include?.variants as
+          { where?: Record<string, unknown> } | true | undefined;
+        return variantsInclude && variantsInclude !== true
+          ? variantsInclude.where
+          : undefined;
+      };
+
+      it('requests only non-soft-deleted variants in the query, for an anonymous caller', async () => {
+        prisma.product.findFirst.mockResolvedValue(productDetailRow);
+
+        await service.findOne('product-1', undefined);
+
+        expect(getVariantsWhere()).toMatchObject({ deletedAt: null });
+      });
+
+      it('requests only non-soft-deleted variants in the query, even for a manager caller', async () => {
+        prisma.product.findFirst.mockResolvedValue(productDetailRow);
+
+        await service.findOne('product-1', managerUser);
+
+        expect(getVariantsWhere()).toMatchObject({ deletedAt: null });
+      });
+    });
+
+    describe('status visibility', () => {
+      it('throws NotFoundException for an anonymous caller requesting a disabled product', async () => {
+        prisma.product.findFirst.mockResolvedValue(null);
+
+        await expect(service.findOne('product-1', undefined)).rejects.toThrow(
+          NotFoundException,
+        );
+      });
+
+      it('throws NotFoundException for a client caller requesting a disabled product', async () => {
+        prisma.product.findFirst.mockResolvedValue(null);
+
+        await expect(service.findOne('product-1', clientUser)).rejects.toThrow(
+          NotFoundException,
+        );
+      });
+
+      it('returns the product for a manager caller requesting a disabled product', async () => {
+        prisma.product.findFirst.mockResolvedValue({
+          ...productDetailRow,
+          status: 'disabled',
+        });
+
+        const result = await service.findOne('product-1', managerUser);
+
+        expect(result.status).toBe('disabled');
+      });
+    });
+
+    describe('query shape', () => {
+      it('queries a single row keyed by id with deletedAt: null in where', async () => {
+        prisma.product.findFirst.mockResolvedValue(productDetailRow);
+
+        await service.findOne('product-1', managerUser);
+
+        const args = getFindFirstArgs();
+        expect(args.where).toMatchObject({
+          id: 'product-1',
+          deletedAt: null,
+        });
+      });
+
+      it('eagerly includes images and variants (with nested variant images) in one query', async () => {
+        prisma.product.findFirst.mockResolvedValue(productDetailRow);
+
+        await service.findOne('product-1', managerUser);
+
+        const args = getFindFirstArgs();
+        expect(args.include).toHaveProperty('images');
+        expect(args.include).toHaveProperty('variants');
+
+        const variantsInclude = args.include?.variants as
+          { include?: Record<string, unknown> } | true | undefined;
+        if (variantsInclude && variantsInclude !== true) {
+          expect(variantsInclude.include).toHaveProperty('images');
+        }
+      });
+    });
+
+    describe('response shape', () => {
+      it('carries through the product own fields', async () => {
+        prisma.product.findFirst.mockResolvedValue(productDetailRow);
+
+        const result = await service.findOne('product-1', managerUser);
+
+        expect(result).toMatchObject({
+          id: 'product-1',
+          name: 'Classic Tee',
+          detail: 'A classic t-shirt',
+          status: 'enabled',
+          images: [expect.objectContaining(image)],
+          createdAt: productDetailRow.createdAt,
+          updatedAt: productDetailRow.updatedAt,
+        });
+      });
+
+      it('carries through each variant own fields including nested images', async () => {
+        prisma.product.findFirst.mockResolvedValue(productDetailRow);
+
+        const result = await service.findOne('product-1', managerUser);
+
+        expect(result.variants).toHaveLength(1);
+        expect(result.variants[0]).toMatchObject({
+          id: 'variant-1',
+          productId: 'product-1',
+          size: 'm',
+          color: 'black',
+          fit: 'regular',
+          gender: 'men',
+          stock: 10,
+          status: 'enabled',
+          images: [expect.objectContaining(variantImage)],
+          createdAt: variantRow.createdAt,
+          updatedAt: variantRow.updatedAt,
+        });
+      });
+
+      it('converts each variant price to a JS number', async () => {
+        prisma.product.findFirst.mockResolvedValue(productDetailRow);
+
+        const result = await service.findOne('product-1', managerUser);
+
+        expect(typeof result.variants[0].price).toBe('number');
+        expect(result.variants[0].price).toBe(29.99);
       });
     });
   });

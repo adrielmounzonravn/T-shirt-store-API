@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Role, ProductStatus } from '../generated/prisma/enums.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { JwtPayload } from '../auth/jwt-payload.interface.js';
 import type { ListProductsQueryDto } from './dto/list-products-query.dto.js';
 import { ProductListEntity } from './entities/product-list.entity.js';
+import { ProductDetailEntity } from './entities/product-detail.entity.js';
 
 @Injectable()
 export class ProductsService {
@@ -48,5 +49,27 @@ export class ProductsService {
       data: products,
       pagination: { limit, offset, total },
     });
+  }
+
+  async findOne(id: string, user?: JwtPayload): Promise<ProductDetailEntity> {
+    const isManager = user?.role === Role.manager;
+
+    const product = await this.prisma.product.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+        ...(!isManager && { status: ProductStatus.enabled }),
+      },
+      include: {
+        images: true,
+        variants: { where: { deletedAt: null }, include: { images: true } },
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return new ProductDetailEntity(product);
   }
 }
