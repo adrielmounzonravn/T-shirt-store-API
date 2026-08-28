@@ -157,7 +157,7 @@ describe('AuthService', () => {
         { expiresIn: number },
       ];
       expect(payload).toEqual({
-        sub: userRow.id,
+        sub: userRow.userId,
         purpose: 'email-verification',
       });
       expect(typeof options.expiresIn).toBe('number');
@@ -248,7 +248,7 @@ describe('AuthService', () => {
       service.signIn(userRow);
 
       expect(jwtService.sign).toHaveBeenCalledWith({
-        sub: userRow.id,
+        sub: userRow.userId,
         role: userRow.role,
       });
       expect(jwtService.sign).toHaveBeenCalledTimes(1);
@@ -257,6 +257,7 @@ describe('AuthService', () => {
     it('throws ForbiddenException and never signs a token for an unverified user', () => {
       const unverifiedUser = new UserEntity({
         ...userRow,
+        id: userRow.userId,
         isVerified: false,
       });
 
@@ -279,7 +280,7 @@ describe('AuthService', () => {
 
     it('throws UnauthorizedException and never looks up the user when the payload purpose is wrong', async () => {
       jwtService.verify.mockReturnValue({
-        sub: userRow.id,
+        sub: userRow.userId,
         purpose: 'password-reset',
       });
 
@@ -305,7 +306,7 @@ describe('AuthService', () => {
 
     it('throws UnauthorizedException and never marks verified when the user is already verified', async () => {
       jwtService.verify.mockReturnValue({
-        sub: userRow.id,
+        sub: userRow.userId,
         purpose: 'email-verification',
       });
       usersService.findById.mockResolvedValue(userRow);
@@ -319,20 +320,27 @@ describe('AuthService', () => {
     it('marks the user verified when the token is valid and the user is not yet verified', async () => {
       const unverifiedUser = new UserEntity({
         ...userRow,
+        id: userRow.userId,
         isVerified: false,
       });
       jwtService.verify.mockReturnValue({
-        sub: unverifiedUser.id,
+        sub: unverifiedUser.userId,
         purpose: 'email-verification',
       });
       usersService.findById.mockResolvedValue(unverifiedUser);
       usersService.markVerified.mockResolvedValue(
-        new UserEntity({ ...unverifiedUser, isVerified: true }),
+        new UserEntity({
+          ...unverifiedUser,
+          id: unverifiedUser.userId,
+          isVerified: true,
+        }),
       );
 
       await expect(service.verifyEmail('valid-token')).resolves.toBeUndefined();
 
-      expect(usersService.markVerified).toHaveBeenCalledWith(unverifiedUser.id);
+      expect(usersService.markVerified).toHaveBeenCalledWith(
+        unverifiedUser.userId,
+      );
       expect(usersService.markVerified).toHaveBeenCalledTimes(1);
     });
   });
@@ -365,7 +373,7 @@ describe('AuthService', () => {
       expect(usersService.createPasswordResetToken).toHaveBeenCalledTimes(1);
       const [userId, hashedToken, expiresAt] = usersService
         .createPasswordResetToken.mock.calls[0] as [string, string, Date];
-      expect(userId).toBe(userRow.id);
+      expect(userId).toBe(userRow.userId);
       expect(typeof hashedToken).toBe('string');
       expect(hashedToken.length).toBeGreaterThan(0);
       expect(expiresAt).toBeInstanceOf(Date);
@@ -416,7 +424,7 @@ describe('AuthService', () => {
     it('looks up the token via findValidPasswordResetToken with a single string argument', async () => {
       usersService.findValidPasswordResetToken.mockResolvedValue({
         id: 'reset-1',
-        userId: userRow.id,
+        userId: userRow.userId,
       });
       usersService.findById.mockResolvedValue(userRow);
 
@@ -443,14 +451,14 @@ describe('AuthService', () => {
     it('updates the password with the row userId and the given plaintext password', async () => {
       usersService.findValidPasswordResetToken.mockResolvedValue({
         id: 'reset-1',
-        userId: userRow.id,
+        userId: userRow.userId,
       });
       usersService.findById.mockResolvedValue(userRow);
 
       await service.resetPassword('raw-token', 'new-plaintext-password');
 
       expect(usersService.updatePassword).toHaveBeenCalledWith(
-        userRow.id,
+        userRow.userId,
         'new-plaintext-password',
       );
       expect(usersService.updatePassword).toHaveBeenCalledTimes(1);
@@ -459,7 +467,7 @@ describe('AuthService', () => {
     it('consumes the reset token row by its id', async () => {
       usersService.findValidPasswordResetToken.mockResolvedValue({
         id: 'reset-1',
-        userId: userRow.id,
+        userId: userRow.userId,
       });
       usersService.findById.mockResolvedValue(userRow);
 
@@ -474,13 +482,13 @@ describe('AuthService', () => {
     it('sends a password-changed notification to the user found by userId', async () => {
       usersService.findValidPasswordResetToken.mockResolvedValue({
         id: 'reset-1',
-        userId: userRow.id,
+        userId: userRow.userId,
       });
       usersService.findById.mockResolvedValue(userRow);
 
       await service.resetPassword('raw-token', 'new-plaintext-password');
 
-      expect(usersService.findById).toHaveBeenCalledWith(userRow.id);
+      expect(usersService.findById).toHaveBeenCalledWith(userRow.userId);
       expect(mailService.sendPasswordChangedEmail).toHaveBeenCalledWith(
         userRow.email,
       );
@@ -490,7 +498,7 @@ describe('AuthService', () => {
     it('does not throw and does not send a notification when the user is no longer found', async () => {
       usersService.findValidPasswordResetToken.mockResolvedValue({
         id: 'reset-1',
-        userId: userRow.id,
+        userId: userRow.userId,
       });
       usersService.findById.mockResolvedValue(null);
 
@@ -504,7 +512,7 @@ describe('AuthService', () => {
     it('resolves to undefined on a successful reset', async () => {
       usersService.findValidPasswordResetToken.mockResolvedValue({
         id: 'reset-1',
-        userId: userRow.id,
+        userId: userRow.userId,
       });
       usersService.findById.mockResolvedValue(userRow);
 

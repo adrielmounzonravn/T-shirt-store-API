@@ -27,7 +27,7 @@ export class AuthService {
   async signUp(input: CreateUserInput): Promise<UserEntity> {
     const user = await this.usersService.create(input);
 
-    const verificationToken = this.signEmailVerificationToken(user.id);
+    const verificationToken = this.signEmailVerificationToken(user.userId);
     await this.mailService.sendVerificationEmail(user.email, verificationToken);
 
     return user;
@@ -50,7 +50,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    await this.usersService.markVerified(user.id);
+    await this.usersService.markVerified(user.userId);
   }
 
   private signEmailVerificationToken(userId: string): string {
@@ -82,7 +82,7 @@ export class AuthService {
       throw new ForbiddenException('Email is not verified yet');
     }
 
-    const payload: JwtPayload = { sub: user.id, role: user.role };
+    const payload: JwtPayload = { sub: user.userId, role: user.role };
     return { accessToken: this.jwtService.sign(payload) };
   }
 
@@ -99,7 +99,7 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + ttlHours * 3600 * 1000);
 
     await this.usersService.createPasswordResetToken(
-      user.id,
+      user.userId,
       this.hashResetToken(rawToken),
       expiresAt,
     );

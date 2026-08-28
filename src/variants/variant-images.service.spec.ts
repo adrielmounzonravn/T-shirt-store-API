@@ -353,7 +353,7 @@ describe('VariantImagesService', () => {
       });
 
       expect(result).toMatchObject({
-        id: 'image-2',
+        imageId: 'image-2',
         skuId: 'variant-1',
         imagePath: coverImageRow.imagePath,
         isCover: true,
@@ -435,7 +435,7 @@ describe('VariantImagesService', () => {
 
       const result = await service.setCover('image-1', { isCover: true });
 
-      expect(result).toMatchObject({ id: 'image-1', isCover: true });
+      expect(result).toMatchObject({ imageId: 'image-1', isCover: true });
     });
   });
 

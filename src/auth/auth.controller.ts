@@ -10,6 +10,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AuthService } from './auth.service.js';
 import { SignUpDto } from './dto/signup.dto.js';
@@ -19,6 +20,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
 import { LocalAuthGuard } from './guards/local-auth.guard.js';
 import { UserEntity } from '../users/entities/user.entity.js';
+import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator.js';
 
 const RESET_PASSWORD_THROTTLE = {
   default: {
@@ -27,6 +29,7 @@ const RESET_PASSWORD_THROTTLE = {
   },
 };
 
+@ApiTags('Auth')
 @Controller('auth')
 @UseInterceptors(ClassSerializerInterceptor)
 export class AuthController {
@@ -34,6 +37,13 @@ export class AuthController {
 
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Sign up',
+    description:
+      'Sends a verification email with a token; the account cannot sign in until verified.',
+  })
+  @ApiResponse({ status: 201, description: 'User created', type: UserEntity })
+  @ApiErrorResponses(400, 409)
   async signUp(@Body() dto: SignUpDto): Promise<UserEntity> {
     return this.authService.signUp(dto);
   }
@@ -41,6 +51,13 @@ export class AuthController {
   @Post('signin')
   @HttpCode(HttpStatus.OK)
   @UseGuards(LocalAuthGuard)
+  @ApiOperation({ summary: 'Sign in' })
+  @ApiResponse({ status: 200, description: 'Authenticated' })
+  @ApiErrorResponses(401)
+  @ApiResponse({
+    status: 403,
+    description: 'Account exists but email is not verified yet',
+  })
   signIn(
     @Body() _dto: SignInDto,
     @Req() req: Request,
@@ -50,6 +67,12 @@ export class AuthController {
 
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify email with token' })
+  @ApiResponse({ status: 200, description: 'Email verified' })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid, expired, or already used token',
+  })
   async verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
     await this.authService.verifyEmail(dto.token);
   }
@@ -57,6 +80,17 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.ACCEPTED)
   @Throttle(RESET_PASSWORD_THROTTLE)
+  @ApiOperation({
+    summary: 'Request password reset',
+    description:
+      'Generates a reset token and sends an email with the link. Subject to rate limiting.',
+  })
+  @ApiResponse({
+    status: 202,
+    description:
+      'Reset email sent (always responds 202 regardless of whether the email exists, to avoid leaking account existence)',
+  })
+  @ApiErrorResponses(429)
   async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<void> {
     await this.authService.forgotPassword(dto.email);
   }
@@ -64,6 +98,17 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @Throttle(RESET_PASSWORD_THROTTLE)
+  @ApiOperation({
+    summary: 'Reset password with token',
+    description:
+      'Subject to rate limiting. On completion, sends an email notifying the password change.',
+  })
+  @ApiResponse({ status: 200, description: 'Password updated' })
+  @ApiErrorResponses(400, 429)
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid, expired, or already used token',
+  })
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
     await this.authService.resetPassword(dto.token, dto.newPassword);
   }

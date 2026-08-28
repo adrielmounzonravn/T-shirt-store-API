@@ -152,7 +152,10 @@ describe('VariantsService', () => {
         const result = await service.findMany('product-1', undefined);
 
         expect(result).toHaveLength(1);
-        expect(result[0]).toMatchObject({ id: 'variant-1', status: 'enabled' });
+        expect(result[0]).toMatchObject({
+          skuId: 'variant-1',
+          status: 'enabled',
+        });
       });
 
       it('returns enabled variants of an enabled product for a client caller', async () => {
@@ -162,7 +165,10 @@ describe('VariantsService', () => {
         const result = await service.findMany('product-1', clientUser);
 
         expect(result).toHaveLength(1);
-        expect(result[0]).toMatchObject({ id: 'variant-1', status: 'enabled' });
+        expect(result[0]).toMatchObject({
+          skuId: 'variant-1',
+          status: 'enabled',
+        });
       });
 
       it('returns both enabled and disabled variants of a disabled product for a manager caller', async () => {
@@ -308,7 +314,7 @@ describe('VariantsService', () => {
       const result = await service.create('product-1', dto);
 
       expect(result).toMatchObject({
-        id: 'variant-1',
+        skuId: 'variant-1',
         productId: 'product-1',
         size: 'm',
         color: 'black',
@@ -433,7 +439,7 @@ describe('VariantsService', () => {
       const result = await service.findOne('variant-1', managerUser);
 
       expect(result).toMatchObject({
-        id: 'variant-1',
+        skuId: 'variant-1',
         productId: 'product-1',
         size: 'm',
         color: 'black',
@@ -547,7 +553,7 @@ describe('VariantsService', () => {
         price: 19.99,
       });
 
-      expect(result).toMatchObject({ id: 'variant-1', stock: 5 });
+      expect(result).toMatchObject({ skuId: 'variant-1', stock: 5 });
       expect(typeof result.price).toBe('number');
       expect(result.price).toBe(19.99);
     });
@@ -714,7 +720,7 @@ describe('VariantsService', () => {
 
       const result = await service.enable('variant-2');
 
-      expect(result).toMatchObject({ id: 'variant-2', status: 'enabled' });
+      expect(result).toMatchObject({ skuId: 'variant-2', status: 'enabled' });
       expect(typeof result.price).toBe('number');
       expect(result.price).toBe(29.99);
     });
@@ -797,7 +803,7 @@ describe('VariantsService', () => {
 
       const result = await service.disable('variant-1');
 
-      expect(result).toMatchObject({ id: 'variant-1', status: 'disabled' });
+      expect(result).toMatchObject({ skuId: 'variant-1', status: 'disabled' });
       expect(typeof result.price).toBe('number');
       expect(result.price).toBe(29.99);
     });

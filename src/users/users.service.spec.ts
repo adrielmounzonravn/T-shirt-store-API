@@ -164,7 +164,7 @@ describe('UsersService', () => {
 
       expect(result).toBeInstanceOf(UserEntity);
       expect(result).toEqual(new UserEntity(userRow));
-      expect(result.id).toBe(userRow.id);
+      expect(result.userId).toBe(userRow.id);
       expect(result.email).toBe(userRow.email);
       expect(result.fullName).toBe(userRow.fullName);
       expect(result.role).toBe(userRow.role);

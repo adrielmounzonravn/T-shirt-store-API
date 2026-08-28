@@ -33,6 +33,9 @@ describe('ProductsService', () => {
     createdAt: new Date('2024-01-01T00:00:00.000Z'),
   };
 
+  const { id: imageIdValue, ...imageRest } = image;
+  const imageEntityFields = { ...imageRest, imageId: imageIdValue };
+
   const productRow = {
     id: 'product-1',
     name: 'Classic Tee',
@@ -50,10 +53,16 @@ describe('ProductsService', () => {
 
   const variantImage = {
     id: 'variant-image-1',
-    variantId: 'variant-1',
+    skuId: 'variant-1',
     imagePath: '/images/variant-1.jpg',
     isCover: true,
     createdAt: new Date('2024-01-01T00:00:00.000Z'),
+  };
+
+  const { id: variantImageIdValue, ...variantImageRest } = variantImage;
+  const variantImageEntityFields = {
+    ...variantImageRest,
+    imageId: variantImageIdValue,
   };
 
   const variantRow = {
@@ -338,7 +347,9 @@ describe('ProductsService', () => {
     it('returns the images nested under each product in data', async () => {
       const result = await service.findMany(baseQuery, managerUser);
 
-      expect(result.data[0].images).toEqual([expect.objectContaining(image)]);
+      expect(result.data[0].images).toEqual([
+        expect.objectContaining(imageEntityFields),
+      ]);
     });
   });
 
@@ -356,11 +367,11 @@ describe('ProductsService', () => {
 
       expect(result.data).toHaveLength(2);
       expect(result.data[0]).toMatchObject({
-        id: 'product-1',
+        productId: 'product-1',
         name: 'Classic Tee',
       });
       expect(result.data[1]).toMatchObject({
-        id: 'product-2',
+        productId: 'product-2',
         name: 'Another Tee',
       });
     });
@@ -555,11 +566,11 @@ describe('ProductsService', () => {
         const result = await service.findOne('product-1', managerUser);
 
         expect(result).toMatchObject({
-          id: 'product-1',
+          productId: 'product-1',
           name: 'Classic Tee',
           detail: 'A classic t-shirt',
           status: 'enabled',
-          images: [expect.objectContaining(image)],
+          images: [expect.objectContaining(imageEntityFields)],
           createdAt: productDetailRow.createdAt,
           updatedAt: productDetailRow.updatedAt,
         });
@@ -572,7 +583,7 @@ describe('ProductsService', () => {
 
         expect(result.variants).toHaveLength(1);
         expect(result.variants[0]).toMatchObject({
-          id: 'variant-1',
+          skuId: 'variant-1',
           productId: 'product-1',
           size: 'm',
           color: 'black',
@@ -580,7 +591,7 @@ describe('ProductsService', () => {
           gender: 'men',
           stock: 10,
           status: 'enabled',
-          images: [expect.objectContaining(variantImage)],
+          images: [expect.objectContaining(variantImageEntityFields)],
           createdAt: variantRow.createdAt,
           updatedAt: variantRow.updatedAt,
         });
@@ -651,7 +662,7 @@ describe('ProductsService', () => {
         expect(result.status).toBe('enabled');
         expect(result.variants).toHaveLength(1);
         expect(result.variants[0]).toMatchObject({
-          id: 'variant-1',
+          skuId: 'variant-1',
           productId: 'product-1',
         });
         expect(typeof result.variants[0].price).toBe('number');
@@ -758,7 +769,10 @@ describe('ProductsService', () => {
 
       const result = await service.update('product-1', { name: 'New Name' });
 
-      expect(result).toMatchObject({ id: 'product-1', name: 'New Name' });
+      expect(result).toMatchObject({
+        productId: 'product-1',
+        name: 'New Name',
+      });
     });
 
     it('throws NotFoundException when no active product with that id exists', async () => {
@@ -864,9 +878,9 @@ describe('ProductsService', () => {
       const result = await service.enable('product-1');
 
       expect(result).toMatchObject({
-        id: 'product-1',
+        productId: 'product-1',
         status: 'enabled',
-        images: [expect.objectContaining(image)],
+        images: [expect.objectContaining(imageEntityFields)],
       });
     });
 
@@ -922,9 +936,9 @@ describe('ProductsService', () => {
       const result = await service.disable('product-1');
 
       expect(result).toMatchObject({
-        id: 'product-1',
+        productId: 'product-1',
         status: 'disabled',
-        images: [expect.objectContaining(image)],
+        images: [expect.objectContaining(imageEntityFields)],
       });
     });
 

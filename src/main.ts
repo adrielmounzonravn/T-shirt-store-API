@@ -73,7 +73,11 @@ async function bootstrap() {
         'Orders',
         'Order history and status. Role-polymorphic, so it lives at /orders rather than /me/orders.',
       )
-      .addBearerAuth()
+      .addServer('http://localhost:3000', 'Local')
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        'bearerAuth',
+      )
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('docs', app, document, {
