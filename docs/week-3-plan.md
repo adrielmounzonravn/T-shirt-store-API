@@ -101,7 +101,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
       on those endpoints
 - [x] Password-change notification email (delivery mechanism may be a stub this
       week; do not block the request on it)
-- [ ] Unit tests for every service in this phase
+- [x] Unit tests for every service in this phase
 
 **Notes:**
 
