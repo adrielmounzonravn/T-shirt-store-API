@@ -50,4 +50,22 @@ export class SkuController {
   remove(@Param('skuId', ParseUUIDPipe) skuId: string): Promise<void> {
     return this.variantsService.remove(skuId);
   }
+
+  @Patch(':skuId/enable')
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies((ability) => ability.can('update', 'ProductVariant'))
+  enable(
+    @Param('skuId', ParseUUIDPipe) skuId: string,
+  ): Promise<ProductVariantEntity> {
+    return this.variantsService.enable(skuId);
+  }
+
+  @Patch(':skuId/disable')
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies((ability) => ability.can('update', 'ProductVariant'))
+  disable(
+    @Param('skuId', ParseUUIDPipe) skuId: string,
+  ): Promise<ProductVariantEntity> {
+    return this.variantsService.disable(skuId);
+  }
 }

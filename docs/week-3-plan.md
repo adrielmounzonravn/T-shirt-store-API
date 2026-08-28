@@ -188,8 +188,8 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 - [x] List and create under a product
 - [x] Detail, update, soft delete
-- [ ] Enable / disable
-- [ ] Sellability as an AND across product + variant
+- [x] Enable / disable
+- [x] Sellability as an AND across product + variant
 - [ ] Unit tests for the service
 
 **Notes:**
@@ -201,6 +201,11 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
   product 404s for anonymous/client, visible to Manager. `update`/`remove`
   are Manager-only (enforced by guards) and only exclude soft-deleted
   targets, not disabled ones — same pattern as `ProductsService`.
+- The AND was already in place from earlier steps: `findOne` filters both the
+  variant's and the nested `product`'s `status`/`deletedAt` explicitly;
+  `findMany` achieves the same by 404ing on a disabled parent product before
+  listing its (already-scoped) variants. No code change was needed for this
+  step, just confirming it.
 
 ## Phase 7 — Images (stretch — move to Week 4 if time runs out)
 

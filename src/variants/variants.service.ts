@@ -106,6 +106,29 @@ export class VariantsService {
     });
   }
 
+  async enable(skuId: string): Promise<ProductVariantEntity> {
+    return this.setStatus(skuId, ProductStatus.enabled);
+  }
+
+  async disable(skuId: string): Promise<ProductVariantEntity> {
+    return this.setStatus(skuId, ProductStatus.disabled);
+  }
+
+  private async setStatus(
+    skuId: string,
+    status: ProductStatus,
+  ): Promise<ProductVariantEntity> {
+    await this.assertActiveVariant(skuId);
+
+    const variant = await this.prisma.productVariant.update({
+      where: { id: skuId },
+      data: { status },
+      include: { images: true },
+    });
+
+    return new ProductVariantEntity(variant);
+  }
+
   private async assertActiveProduct(productId: string): Promise<void> {
     const product = await this.prisma.product.findFirst({
       where: { id: productId, deletedAt: null },
