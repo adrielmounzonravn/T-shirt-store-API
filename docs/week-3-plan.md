@@ -225,7 +225,7 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 ## Phase 8 — Close the checkpoint
 
-- [ ] Generated Swagger compared against `openapi.yaml`; differences resolved
+- [x] Generated Swagger compared against `openapi.yaml`; differences resolved
       (the spec wins)
 - [x] OWASP checklist pass (`implementation-notes.md` §13)
 - [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:cov` green
@@ -234,9 +234,10 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 **Notes:**
 
-- Swagger-vs-spec comparison done; the full list of differences and files to
-  touch is logged in `docs/pendings.md` (not fixed yet — pending detailed
-  review before implementing).
-- OWASP checklist pass done; all items compliant except one soft gap
-  (`ValidationPipe` missing `forbidNonWhitelisted: true`), logged in
-  `docs/pendings.md`.
+- Swagger-vs-spec comparison done and all drift resolved: `@nestjs/swagger`
+  decorators added throughout, API-facing entity fields renamed to match the
+  spec (`id` → `userId`/`productId`/`skuId`/`imageId`), `products.controller.ts`
+  route param renamed `:id` → `:productId`. Prisma schema untouched — renames
+  are serialization-only.
+- OWASP checklist pass done; all items compliant, including the previous
+  soft gap (`ValidationPipe` now sets `forbidNonWhitelisted: true`).
