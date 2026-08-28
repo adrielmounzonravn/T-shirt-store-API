@@ -131,8 +131,8 @@ payments and stock notifications are Week 4 — see `next-phase.md`.
 
 - [x] Role decorator + guard (Manager-only endpoints)
 - [x] CASL ability factory (all rules live here) + policies guard
-- [ ] Current-user decorator, guard order verified on a protected route
-- [ ] Unit tests for the ability factory and the guards
+- [x] Current-user decorator, guard order verified on a protected route
+- [x] Unit tests for the ability factory and the guards
 
 **Notes:**
 
