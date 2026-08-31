@@ -4,17 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A NestJS + Prisma + PostgreSQL T-shirt store API (capstone project, see `docs/challenge.md`). `src/` currently only has the default Nest boilerplate (`AppController`/`AppService`/`AppModule`) — no domain modules exist yet.
+A NestJS + Prisma + PostgreSQL T-shirt store API (capstone project, see `docs/challenge.md`). `src/` has auth, CASL authorization, products, SKUs/variants, and product/variant image upload (S3) as working domain modules; cart, orders, and payments are not implemented yet.
 
-**Current scope (this week's checkpoint): authentication, products, and SKUs/variants (basic catalog) only.** Cart, orders, and payments are designed in `docs/` but out of scope for now — don't implement or scaffold them until asked.
+**Current scope (Week 4 checkpoint): everything remaining from `docs/challenge.md`.** Liked products, cart, orders (status flow `pending → paid → processing → shipped` / `cancelled`, order history with filters + pagination), Stripe checkout (Payment Links and Payment Intents) and the Stripe webhook, the stock-notification background job (BullMQ), cron jobs (cart expiry, reset-token cleanup), the mandatory architecture write-up, and end-to-end tests. Nothing from `docs/challenge.md`'s "Scope — optional features excluded" comes into scope.
 
-**Unit tests are mandatory alongside development, and must be written by a separate subagent — never by the agent that wrote the implementation.** Write `*.spec.ts` tests for each service as you build it, not afterward, but delegate the actual test-writing to a subagent (e.g. via the Agent tool) rather than writing them yourself. The subagent must receive the service's public interface (file path, exported methods, types, expected behavior/spec from `docs/`) but **not** the implementation itself or any notes on how it was built — the point is to get tests free of the implementer's blind spots, able to catch missing cases or bugs the implementer wouldn't think to check. There are no E2E tests yet — `test/app.e2e-spec.ts` and the e2e Vitest config exist but e2e coverage isn't part of current scope.
+**Unit tests are mandatory alongside development, and must be written by a separate subagent — never by the agent that wrote the implementation.** Write `*.spec.ts` tests for each service as you build it, not afterward, but delegate the actual test-writing to a subagent (e.g. via the Agent tool) rather than writing them yourself. The subagent must receive the service's public interface (file path, exported methods, types, expected behavior/spec from `docs/`) but **not** the implementation itself or any notes on how it was built — the point is to get tests free of the implementer's blind spots, able to catch missing cases or bugs the implementer wouldn't think to check.
+
+**E2E tests are in scope this checkpoint**, covering the critical paths the challenge names: authentication, checkout, and order history. The authentication e2e tests must be written before any of this checkpoint's code is changed; the checkout and order-history e2e tests are written as those flows land, not held until the end of the block. Like unit tests, e2e tests must always be written by a separate subagent — never by the agent that wrote the implementation. They run against a real Postgres via Testcontainers, not an in-memory or mocked database.
 
 **Delegate long or extensive tasks to subagents** to keep the main agent's context clean — a saturated context tends to lose track of details from earlier phases of `docs/` or this file. Prefer spawning a subagent for broad exploration, multi-file implementation, or any step that would otherwise consume a large chunk of context, rather than doing it all inline.
 
-## Working checklist — `docs/week-3-plan.md`
+## Working checklist — `docs/week-4-plan.md`
 
-The step-by-step plan for the current checkpoint, and the way sessions hand off context to each other. Read it before starting work to see what's done and what's next, and keep it current:
+The step-by-step plan for the current checkpoint, and the way sessions hand off context to each other. Read it before starting work to see what's done and what's next, and keep it current. `docs/week-3-plan.md` stays as the record of the prior checkpoint.
 
 - **Tick the step you finished** (`[ ]` → `[x]`) as part of the same task — don't leave it for the user. A step that lands as a single commit ties the tick into that same commit. A step that spans several commits (see **Git commits** below) gets the tick in a follow-up commit once all of them have landed — don't bundle it into one of the intermediate commits.
 - **Add a note only if a future session would be wrong without it**: a deviation from `docs/`, a blocker, a decision taken on the fly. One or two lines under that phase's **Notes**.
@@ -78,4 +80,4 @@ npx prisma generate                                    # regenerate the client i
 
 - **ESM module resolution**: `package.json` sets `"type": "module"`, and TS uses `module`/`moduleResolution: nodenext`. Relative imports need the `.js` extension (e.g. `from './app.service.js'`) — this is required by nodenext, not a mistake to fix.
 - **Prisma client output**: generated into `src/generated/prisma` (gitignored), not the default `node_modules/.prisma` — import the client from there.
-- **Testing setup**: unit tests (`*.spec.ts`) run via `vitest.config.ts` with `@nestjs/testing`; e2e tests would use the separate `vitest.config.e2e.ts`, but aren't in scope yet.
+- **Testing setup**: unit tests (`*.spec.ts`) run via `vitest.config.ts` with `@nestjs/testing`; e2e tests (`*.e2e-spec.ts`) run via the separate `vitest.config.e2e.ts`, against a real Postgres started with Testcontainers.

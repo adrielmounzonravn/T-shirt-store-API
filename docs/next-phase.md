@@ -1,5 +1,7 @@
 # Pendings
 
+A later session deletes this file once every item on it is resolved.
+
 ## Week 3 → Week 4 scope expansion (added 2026-08-27)
 
 `CLAUDE.md` currently scopes this repo to auth + products + SKUs (the Week 3
@@ -8,12 +10,12 @@ checkpoint from `docs/challenge.md`) and says cart/orders/payments are
 them until asked." When that instruction comes, the following need to change
 together — not just `CLAUDE.md`.
 
-- [ ] **`CLAUDE.md` — "Current scope" paragraph.** Replace the Week 3-only
+- [x] **`CLAUDE.md` — "Current scope" paragraph.** Replace the Week 3-only
       scope statement with the full Week 3+4 scope: auth, products/SKUs,
       cart, orders, payments (Stripe), stock notifications, CASL, S3 uploads.
       Update or drop the "`src/` currently only has the default Nest
       boilerplate" line to match whatever actually exists in `src/` by then.
-- [ ] **`CLAUDE.md` — "Unit tests are mandatory... There are no E2E tests
+- [x] **`CLAUDE.md` — "Unit tests are mandatory... There are no E2E tests
       yet" paragraph.** `challenge.md`'s Mandatory Implementations section
       requires "End-to-end tests covering the critical paths: authentication,
       checkout, and order history." This is in scope starting Week 4 — update

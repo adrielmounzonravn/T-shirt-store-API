@@ -174,11 +174,12 @@ from `pending → paid` (`checkout.session.completed` for Payment Links,
 
 # Part B — Course material applied to this project
 
-The five courses below are the material the tutors provided for this challenge.
-Treat them as the **default** answer: when a course covers the problem, use its
-approach rather than inventing one. This is a *should*, not a *must* — where a
-case is clearly not what the course was solving, or where this repo has a better
-option, §13 records the divergence instead of forcing the fit.
+The seven courses below are the material the tutors provided for this
+challenge. Treat them as the **default** answer: when a course covers the
+problem, use its approach rather than inventing one. This is a *should*, not
+a *must* — where a case is clearly not what the course was solving, or where
+this repo has a better option, §13 records the divergence instead of forcing
+the fit.
 
 Base path for every reference below:
 
@@ -189,7 +190,7 @@ Base path for every reference below:
 Each `modulo.mdx` opens with a *Vistazo* — a one-screen summary. Read that first;
 drop into the individual topic only when implementing that exact piece.
 
-## 6. The five courses at a glance
+## 6. The courses at a glance
 
 | Course (directory) | Settles for this project |
 |---|---|
@@ -198,12 +199,12 @@ drop into the individual topic only when implementing that exact piece.
 | `seguridad-en-nestjs` | Request-pipeline order, Passport+JWT, RBAC vs CASL, bcrypt, CORS/helmet/throttler, OWASP mapping |
 | `nestjs-documentacion-y-tareas-en-segundo-plano` | `@nestjs/swagger`, `@nestjs/schedule`, BullMQ, `event-emitter`, `Logger`, `HttpModule` |
 | `testing-unitario-y-tdd` | What a good unit test is, Jest matchers/mocks, `Test.createTestingModule`, TDD cycle, Given/When/Then |
+| `pagos-e-integraciones` | Payment Link vs PaymentIntent (which one, when), verifying the Stripe webhook signature before trusting the body, testing webhooks locally with the Stripe CLI, `FileInterceptor` + S3 (already applied in Week 3) |
+| `e2e-cicd-y-observabilidad` | `Supertest` against a real `INestApplication` for e2e, Testcontainers instead of an in-memory DB for the e2e Postgres — CI/CD (GitHub Actions) and OpenTelemetry-based observability are in the same course but not required by `challenge.md`, beyond the "what to monitor" line in the architecture write-up |
 
-Two more courses exist in that directory and are **not** part of this checkpoint:
-`e2e-cicd-y-observabilidad` (Supertest, Testcontainers, GitHub Actions,
-OpenTelemetry) and `pagos-e-integraciones` (Stripe, webhooks, S3). They become
-relevant for the E2E-test and Stripe/S3 requirements later — noted here so
-nobody re-derives that material from scratch when the time comes.
+`pagos-e-integraciones` and `e2e-cicd-y-observabilidad` are now in scope for
+this checkpoint (Stripe/webhooks and the e2e requirement land in Week 4) — see
+`docs/week-4-plan.md`.
 
 ## 7. Where each rule goes in the request pipeline
 
