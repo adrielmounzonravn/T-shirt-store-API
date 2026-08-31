@@ -107,6 +107,37 @@ write-up. This closes out `docs/challenge.md`.
 
 **Notes:**
 
+## Phase 1.5 — Real email delivery (SMTP provider)
+
+- [ ] Sign up for a free Mailtrap account, create a Sandbox inbox, and copy
+      its SMTP credentials
+- [ ] Set `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD` in the local
+      `.env` (not `.env.test` — e2e keeps empty placeholders on purpose, see
+      Phase 0 notes)
+- [ ] Manually trigger the three email flows that already exist — sign-up
+      (verification), forgot-password, and password-change — through the
+      running app and confirm all three land in the Mailtrap Sandbox inbox
+- [ ] Document the chosen provider in `implementation-notes.md` §4 (settled
+      decisions) so it isn't re-litigated later
+
+**Notes:**
+- No code changes expected: `MailService` already wraps a generic
+  `nodemailer` SMTP transport (`src/mail/mail.service.ts`), so this phase is
+  config-only. E2E tests don't need this — they run with empty SMTP
+  credentials and `MailService` swallows send failures, so the auth e2e
+  suite (Phase 1) already passes without a real provider.
+- Mailtrap Sandbox was chosen over Resend specifically because it's plain
+  SMTP with no domain-verification requirement, matching the SMTP-shaped
+  config that already exists — Resend would need a verified domain to send
+  to arbitrary recipients.
+- Full inventory of email cases in this project (only these four —
+  `challenge.md`/`openapi.yaml` have no others, e.g. no order-confirmation
+  email): email verification, forgot/reset password, password-changed
+  notification (all three covered here), and the stock notification
+  (Phase 6, MUST per challenge §8, threshold is stock *reaching* 3 — not
+  "below 3"). The 4th case is verified manually as part of Phase 6 itself,
+  once it's actually built.
+
 ## Phase 2 — Liked products and cart
 
 - [ ] Like / unlike a product, list liked products
@@ -166,6 +197,10 @@ write-up. This closes out `docs/challenge.md`.
 - [ ] `attempts` + backoff on the job; failures logged via `@OnWorkerEvent('failed')`,
       never swallowed
 - [ ] Unit tests for the processor/service
+- [ ] Manually trigger the job against the real Mailtrap SMTP credentials set
+      up in Phase 1.5 and confirm the email (with the product's cover image)
+      lands in the Mailtrap Sandbox inbox — this is the 4th and last email
+      case in the project
 
 **Notes:**
 

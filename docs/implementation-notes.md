@@ -150,6 +150,12 @@ These were argued and closed. Reopen only with new information.
 - **Optional features are out of scope.** Delivery-person role, the `delivered`
   status, full status history, and promo codes are not in the schema or the spec.
   Adding any of them later means new tables plus new CASL abilities.
+- **Mailtrap Sandbox as the real SMTP provider**, not Resend. `MailService`
+  already wraps a generic `nodemailer` SMTP transport, so a plain-SMTP
+  provider needs no code changes and no domain verification — unlike Resend,
+  which requires a verified domain to send to arbitrary recipients. Only
+  the local `.env` gets real credentials; `.env.test` keeps empty
+  placeholders since e2e doesn't need actual delivery.
 
 ### Course-material decisions (see §13 for the full reasoning)
 
