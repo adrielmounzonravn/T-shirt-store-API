@@ -25,6 +25,13 @@ const validEnv = {
   REDIS_HOST: 'localhost',
   REDIS_PORT: '6379',
 
+  QUEUE_JOB_ATTEMPTS: '3',
+  QUEUE_JOB_BACKOFF_DELAY_MS: '2000',
+
+  STRIPE_SUCCESS_URL: 'http://localhost:3000/checkout/success',
+  STRIPE_CANCEL_URL: 'http://localhost:3000/checkout/cancel',
+  STRIPE_CURRENCY: 'usd',
+
   S3_BUCKET: 'bucket',
   S3_REGION: 'us-east-1',
 

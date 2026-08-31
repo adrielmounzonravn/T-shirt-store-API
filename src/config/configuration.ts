@@ -45,6 +45,22 @@ export default () => ({
     port: parseInt(process.env.REDIS_PORT ?? '', 10),
   },
 
+  queue: {
+    jobAttempts: parseInt(process.env.QUEUE_JOB_ATTEMPTS ?? '', 10),
+    jobBackoffDelayMs: parseInt(
+      process.env.QUEUE_JOB_BACKOFF_DELAY_MS ?? '',
+      10,
+    ),
+  },
+
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    successUrl: process.env.STRIPE_SUCCESS_URL,
+    cancelUrl: process.env.STRIPE_CANCEL_URL,
+    currency: process.env.STRIPE_CURRENCY,
+  },
+
   s3: {
     bucket: process.env.S3_BUCKET,
     region: process.env.S3_REGION,

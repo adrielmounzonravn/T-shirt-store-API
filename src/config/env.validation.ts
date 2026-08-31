@@ -28,6 +28,23 @@ export const envValidationSchema = Joi.object({
   REDIS_HOST: Joi.string().required(),
   REDIS_PORT: Joi.number().required(),
 
+  QUEUE_JOB_ATTEMPTS: Joi.number().required(),
+  QUEUE_JOB_BACKOFF_DELAY_MS: Joi.number().required(),
+
+  STRIPE_SECRET_KEY: Joi.string().when('NODE_ENV', {
+    is: 'production',
+    then: Joi.required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  STRIPE_WEBHOOK_SECRET: Joi.string().when('NODE_ENV', {
+    is: 'production',
+    then: Joi.required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  STRIPE_SUCCESS_URL: Joi.string().uri().required(),
+  STRIPE_CANCEL_URL: Joi.string().uri().required(),
+  STRIPE_CURRENCY: Joi.string().lowercase().required(),
+
   S3_BUCKET: Joi.string().required(),
   S3_REGION: Joi.string().required(),
   S3_ACCESS_KEY_ID: Joi.string().allow('').optional(),
