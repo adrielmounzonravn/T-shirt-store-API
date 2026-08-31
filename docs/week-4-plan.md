@@ -22,7 +22,7 @@ write-up. This closes out `docs/challenge.md`.
 
 - [x] Install this week's dependencies: `stripe`, `@nestjs/bullmq` + `bullmq`,
       `@nestjs/schedule`
-- [ ] Install Testcontainers packages for e2e (owned by the e2e-harness step
+- [x] Install Testcontainers packages for e2e (owned by the e2e-harness step
       below, not this setup pass)
 - [x] Redis added to the local run story (`docker-compose.yml`); e2e uses
       Testcontainers for Postgres, so no dedicated test-database service is
@@ -33,7 +33,7 @@ write-up. This closes out `docs/challenge.md`.
       ones
 - [x] Stripe webhook raw-body wiring in `main.ts` (signature verification
       needs the untouched request body, not the JSON-parsed one)
-- [ ] E2E harness enabled: `test/app.e2e-spec.ts` back in `tsconfig.json`/
+- [x] E2E harness enabled: `test/app.e2e-spec.ts` back in `tsconfig.json`/
       `eslint.config.mjs`, `vitest.config.e2e.ts` wired to a Testcontainers
       Postgres, `npm run test:e2e` runs green with the starter test
 
@@ -61,6 +61,38 @@ write-up. This closes out `docs/challenge.md`.
   validated the compose file, but `docker compose up -d` / a healthy Redis
   container were not verified here. A future session should confirm Redis
   actually comes up healthy before Phase 6 (stock notification job).
+- **E2E harness**: `test/e2e/global-setup.ts` is a Vitest `globalSetup` that
+  starts a `postgres:16-alpine` Testcontainer once per `test:e2e` run, points
+  `DATABASE_URL` at it, and runs `prisma migrate deploy` against it (not
+  `db push` — the repo's migrations hand-add partial indexes and CHECK
+  constraints per `implementation-notes.md` §1 that `db push` would silently
+  drop). `process.env.DATABASE_URL` set there is inherited by the Vitest
+  worker that actually runs the suites, since the worker is spawned only
+  after `globalSetup` resolves. `vitest.config.e2e.ts` sets
+  `fileParallelism: false` because every suite shares that one database
+  (see `resetDatabase` in `test/e2e/test-app.ts`).
+- **E2E env**: a checked-in `.env.test` (not `.env`, not gitignored) supplies
+  every other required env var with safe placeholders — empty
+  Stripe/S3/SMTP credentials, a throttle limit high enough not to trip on a
+  suite that fires many requests. `DATABASE_URL` is deliberately absent from
+  it; the global setup overwrites it after the container starts. No real
+  cloud credentials are needed to run `npm run test:e2e`.
+- `test/e2e/test-app.ts`'s `createTestApp()` mirrors `main.ts`'s
+  `ValidationPipe` options and the `rawBody: true` app option (needed later
+  for the Stripe webhook signature check); the exception filter, serializer
+  interceptor and throttler guard don't need re-registering because
+  `AppModule` already wires them as `APP_FILTER`/`APP_INTERCEPTOR`/
+  `APP_GUARD` providers. Helmet and CORS (plain middleware, not part of the
+  request pipeline the spec asserts against) were deliberately left out of
+  the test app — nothing in the planned e2e suites exercises them.
+- `seedUser`/`signAccessToken` in `test/e2e/test-app.ts` exist because
+  sign-up always creates an unverified `client` and there is no
+  manager-creation endpoint — suites needing a verified user or a manager
+  have no other way to get one. Seeding a product was left out: no suite
+  needs it yet, and it belongs with whichever subagent writes the Phase 2/3
+  suites that do.
+- Running `npm run test:e2e` requires Docker (or another Testcontainers-
+  compatible runtime) available locally or in CI; there is no fallback path.
 
 ## Phase 1 — E2E: authentication
 
@@ -160,4 +192,5 @@ write-up. This closes out `docs/challenge.md`.
 - [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`,
       `npm run test:cov` all green
 - [ ] `CLAUDE.md` scope paragraph updated to match what exists
-- [ ] `docs/next-phase.md` deleted once every item on it is resolved
+- [x] `docs/next-phase.md` deleted once every item on it is resolved (done in
+      Phase 0 — the e2e setup exclusions were its only remaining item)
