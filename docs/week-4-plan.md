@@ -180,12 +180,14 @@ write-up. This closes out `docs/challenge.md`.
 
 ## Phase 8 — Architecture write-up
 
-- [ ] `docs/architecture.md`: one production diagram, plus a short rationale
-      for the queue decision (BullMQ vs cron vs event, per
-      `implementation-notes.md` §11), the deploy shape, and what would be
-      monitored in production (challenge's Mandatory Implementations)
+- [x] One production diagram, plus a short rationale for the queue decision
+      (BullMQ vs cron vs event, per `implementation-notes.md` §11), the
+      deploy shape, and what would be monitored in production (challenge's
+      Mandatory Implementations)
 
 **Notes:**
+- Delivered as a Claude Artifact rather than `docs/architecture.md`:
+  https://claude.ai/code/artifact/7311327f-5585-46b3-b777-ef8f43370967
 
 ## Phase 9 — Close the block
 
