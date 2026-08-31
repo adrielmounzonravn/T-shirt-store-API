@@ -18,7 +18,7 @@ export default async function setup(): Promise<() => Promise<void>> {
   loadEnv({ path: resolve(process.cwd(), '.env.test') });
 
   const container: StartedPostgreSqlContainer = await new PostgreSqlContainer(
-    'postgres:16-alpine',
+    'postgres:17-alpine',
   )
     .withDatabase('tshirt_store_e2e')
     .withUsername('tshirt_store_e2e')
