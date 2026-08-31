@@ -62,7 +62,8 @@ write-up. This closes out `docs/challenge.md`.
   container were not verified here. A future session should confirm Redis
   actually comes up healthy before Phase 6 (stock notification job).
 - **E2E harness**: `test/e2e/global-setup.ts` is a Vitest `globalSetup` that
-  starts a `postgres:16-alpine` Testcontainer once per `test:e2e` run, points
+  starts a `postgres:17-alpine` Testcontainer (same image as
+  `docker-compose.yml`) once per `test:e2e` run, points
   `DATABASE_URL` at it, and runs `prisma migrate deploy` against it (not
   `db push` — the repo's migrations hand-add partial indexes and CHECK
   constraints per `implementation-notes.md` §1 that `db push` would silently
@@ -93,6 +94,8 @@ write-up. This closes out `docs/challenge.md`.
   suites that do.
 - Running `npm run test:e2e` requires Docker (or another Testcontainers-
   compatible runtime) available locally or in CI; there is no fallback path.
+  The pre-commit hook (`.claude/settings.json`) now runs it too, so Docker
+  must be up to commit at all.
 
 ## Phase 1 — E2E: authentication
 

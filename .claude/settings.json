@@ -6,10 +6,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npm run lint 1>&2 && npm run typecheck 1>&2 && npm test 1>&2 || exit 2",
+            "command": "npm run lint 1>&2 && npm run typecheck 1>&2 && npm test 1>&2 && npm run test:e2e 1>&2 || exit 2",
             "if": "Bash(git commit *)",
-            "timeout": 180,
-            "statusMessage": "Running lint, typecheck and tests before commit..."
+            "timeout": 300,
+            "statusMessage": "Running lint, typecheck, unit and e2e tests before commit..."
           }
         ]
       }
