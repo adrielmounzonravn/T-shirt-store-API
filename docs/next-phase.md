@@ -21,12 +21,15 @@ together — not just `CLAUDE.md`.
       checkout, and order history." This is in scope starting Week 4 — update
       the paragraph once e2e work actually begins, and resolve the
       "E2E setup exclusions" pending below at the same time.
-- [ ] **`docs/implementation-notes.md` §5 "Known gap".** `POST
+- [x] **`docs/implementation-notes.md` §5 "Known gap".** `POST
       /webhooks/stripe` is not yet in `openapi.yaml`. It must be specced
       there and implemented alongside the Stripe integration — this note
       says do it "alongside", so don't let the endpoint land in code before
-      the spec.
-- [ ] **New dependencies** (check before assuming any are installed):
+      the spec. (Already specced — `implementation-notes.md` §5 itself now
+      says "now specced" and `openapi.yaml` has the `/webhooks/stripe`,
+      `/checkout/payment-link` and `/checkout/payment-intent` operations.
+      Implementation is still Phase 3/4 of `week-4-plan.md`.)
+- [x] **New dependencies** (check before assuming any are installed):
       `@nestjs/config` + a schema validator (Joi/Zod/`class-validator`) for
       env validation, `class-validator` + `class-transformer` for the
       `ValidationPipe`, `@nestjs/passport` + `passport` + `passport-jwt` +
@@ -38,13 +41,14 @@ together — not just `CLAUDE.md`.
       `@nestjs/platform-express` file interceptor), and a mailer for the
       password-change and stock-notification emails. `@aws-sdk/client-s3` is
       already installed and wired (Phase 7, `src/storage/`).
-- [ ] **`nest-cli.json`** — add `"compilerOptions": { "plugins":
+- [x] **`nest-cli.json`** — add `"compilerOptions": { "plugins":
       ["@nestjs/swagger"] }` per `implementation-notes.md` §13, before
-      relying on inferred `@ApiProperty()` decorators.
-- [ ] **Local infra** — no `docker-compose.yml` exists yet; Redis (BullMQ)
+      relying on inferred `@ApiProperty()` decorators. (Already done in an
+      earlier phase — verified present, no change needed here.)
+- [x] **Local infra** — no `docker-compose.yml` exists yet; Redis (BullMQ)
       and Postgres both need a local run story before background jobs or
       migrations can be tested.
-- [ ] **`.env`** — extend with every setting listed in
+- [x] **`.env`** — extend with every setting listed in
       `implementation-notes.md` §3 that isn't already there (Redis
       host/port, Stripe keys, S3 bucket/region, mailer config, JWT secret).
 

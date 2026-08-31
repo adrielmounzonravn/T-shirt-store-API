@@ -20,21 +20,47 @@ write-up. This closes out `docs/challenge.md`.
 
 ## Phase 0 — Setup
 
-- [ ] Install this week's dependencies: `stripe`, `@nestjs/bullmq` + `bullmq`,
-      `@nestjs/schedule`, Testcontainers packages for e2e
-- [ ] Redis and a dedicated test database added to the local run story
-      (`docker-compose.yml` or documented alternative)
-- [ ] `.env`/`.env.example` extended with the Week-4 settings from
+- [x] Install this week's dependencies: `stripe`, `@nestjs/bullmq` + `bullmq`,
+      `@nestjs/schedule`
+- [ ] Install Testcontainers packages for e2e (owned by the e2e-harness step
+      below, not this setup pass)
+- [x] Redis added to the local run story (`docker-compose.yml`); e2e uses
+      Testcontainers for Postgres, so no dedicated test-database service is
+      needed here
+- [x] `.env`/`.env.example` extended with the Week-4 settings from
       `implementation-notes.md` §3 (Redis, Stripe keys, low-stock threshold,
       cart TTL) and env schema validation updated to fail at boot on missing
       ones
-- [ ] Stripe webhook raw-body wiring in `main.ts` (signature verification
+- [x] Stripe webhook raw-body wiring in `main.ts` (signature verification
       needs the untouched request body, not the JSON-parsed one)
 - [ ] E2E harness enabled: `test/app.e2e-spec.ts` back in `tsconfig.json`/
       `eslint.config.mjs`, `vitest.config.e2e.ts` wired to a Testcontainers
       Postgres, `npm run test:e2e` runs green with the starter test
 
 **Notes:**
+- `stripe`/`@nestjs/bullmq`/`bullmq`/`@nestjs/schedule` needed
+  `--legacy-peer-deps` (same `@nestjs/throttler@6.5.0` vs `@nestjs/common@12`
+  peer clash noted in the Week-3 Phase 0 notes; no new conflict introduced).
+  Testcontainers packages were **not** installed here — that is the e2e
+  agent's own Phase-0 sub-step, deliberately left untouched per this task's
+  scope.
+- Only a Redis service was added to `docker-compose.yml` (named volume +
+  healthcheck, mirrors the postgres service). No test-database service was
+  added — e2e uses Testcontainers, so it needs no compose service.
+- `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` are `Joi.string().allow('')`
+  outside `NODE_ENV=production` (required only in production) so the app
+  keeps booting for Phase 1/2 (auth e2e, cart) before Stripe integration
+  lands; `STRIPE_SUCCESS_URL`/`STRIPE_CANCEL_URL`/`STRIPE_CURRENCY` are
+  always required, since they're plain config, not secrets pending account
+  setup.
+- Added `QUEUE_JOB_ATTEMPTS`/`QUEUE_JOB_BACKOFF_DELAY_MS` (required) for the
+  BullMQ `attempts`/`backoff` options `implementation-notes.md` §11 asks
+  for on the stock-notification and password-change-email jobs — not listed
+  by name in §3 but needed by the settled BullMQ config shape.
+- Docker was not running in this environment: `docker compose config`
+  validated the compose file, but `docker compose up -d` / a healthy Redis
+  container were not verified here. A future session should confirm Redis
+  actually comes up healthy before Phase 6 (stock notification job).
 
 ## Phase 1 — E2E: authentication
 
