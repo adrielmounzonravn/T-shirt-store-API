@@ -1,29 +1,25 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module.js';
+import { closeTestApp, createTestApp, type TestApp } from './e2e/test-app.js';
 
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+// Harness smoke test, not feature coverage: proves the Testcontainers
+// Postgres + full Nest bootstrap (guards, pipes, filters) actually works
+// end to end. Feature e2e suites (auth, checkout, order history) are
+// Phase 1/3/4/5 of `docs/week-4-plan.md`.
+describe('Health (e2e)', () => {
+  let testApp: TestApp;
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    await app.init();
+  beforeAll(async () => {
+    testApp = await createTestApp();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
+  afterAll(async () => {
+    await closeTestApp(testApp);
+  });
+
+  it('/health (GET) reports the database connection as healthy', () => {
+    return request(testApp.app.getHttpServer())
+      .get('/health')
       .expect(200)
-      .expect('Hello World!');
-  });
-
-  afterEach(async () => {
-    await app.close();
+      .expect({ status: 'ok' });
   });
 });
