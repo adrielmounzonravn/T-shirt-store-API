@@ -163,12 +163,21 @@ These were argued and closed. Reopen only with new information.
   Vitest. The NestJS testing pieces are identical; only the mock API changes
   (translation table in §12).
 
-## 5. Known gap
+## 5. Webhook and checkout idempotency — now specced
 
-`POST /webhooks/stripe` is not yet in `openapi.yaml`. It is the only transition
-from `pending → paid` (`checkout.session.completed` for Payment Links,
-`payment_intent.succeeded` for Payment Intents) and is mandatory per challenge
-§7 — it must be specced and implemented alongside the Stripe integration.
+`POST /webhooks/stripe` is specced in `openapi.yaml` (tag `Webhooks`): no
+bearer auth (`security: []`), authenticated instead by the `Stripe-Signature`
+header, `200` for any acknowledged event (including ignored types — that is
+what stops Stripe retrying forever), `400` for a malformed payload or an
+invalid signature (both raised by the same `constructEvent` try/catch — see
+the spec's description for why this is 400 and not 401). It is the only
+transition from `pending → paid` (`checkout.session.completed` for Payment
+Links, `payment_intent.succeeded` for Payment Intents) and is mandatory per
+challenge §7 — it still needs implementing, in Phase 4 (`docs/week-4-plan.md`).
+
+`POST /checkout/payment-link` and `POST /checkout/payment-intent` now require
+an `Idempotency-Key` header (component `IdempotencyKey` in `openapi.yaml`) —
+closes the loose end left open in §13.
 
 ---
 
@@ -478,7 +487,9 @@ is why it reads the way it does. Worth re-reading when *changing* the contract:
   than a general-purpose `PATCH`.
 - **`02-idempotencia.mdx`** — why `enable`/`disable` are not a `toggle` (§4), and
   **idempotency keys** for `POST /checkout/*`: a retried checkout must not
-  charge twice. Not in scope this week; do not lose it.
+  charge twice. Now specced — see the required `Idempotency-Key` header
+  (component `IdempotencyKey`) on both checkout operations in `openapi.yaml`,
+  and §5.
 - **`04-openapi-como-contrato/02-cambios-seguros-y-cambios-que-rompen.mdx`** —
   the table to check before editing the spec. Renaming a field, tightening a
   type, changing a status code, and moving the token all read as improvements

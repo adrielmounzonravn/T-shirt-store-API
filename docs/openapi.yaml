@@ -38,6 +38,10 @@ tags:
     description: The authenticated user's active shopping cart and its items, under /me/cart.
   - name: Checkout
     description: Stripe-based checkout via Payment Links and Payment Intents.
+  - name: Webhooks
+    description: >
+      Inbound events from third parties (Stripe). Called by Stripe, not by a
+      user, so these operations carry no bearer auth.
   - name: Orders
     description: >
       Order history and status. Role-polymorphic, so it lives at /orders rather
@@ -903,10 +907,9 @@ paths:
   # Not under /me/*: checkout is an action, not a collection of the caller's
   # resources. It operates on the caller's own cart, but the path names the
   # operation (payment-link / payment-intent), so /me adds nothing.
-  # No POST /webhooks/stripe specced yet, but it is mandatory and must be added
-  # with the Stripe integration: checkout.session.completed (Payment Links) and
-  # payment_intent.succeeded (Payment Intents) are the only path pending -> paid,
-  # and the only place stock is decremented.
+  # POST /webhooks/stripe (below, under its own tag) is where checkout.session.completed
+  # (Payment Links) and payment_intent.succeeded (Payment Intents) are handled — the
+  # only path pending -> paid, and the only place stock is decremented.
   /checkout/payment-link:
     post:
       tags: [Checkout]
@@ -921,6 +924,8 @@ paths:
         status='active', and the user's regular cart is normally already
         active (GET /me/cart creates it transparently), so an invisible cart
         created as active would violate that constraint.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -966,6 +971,8 @@ paths:
         Validates stock availability for every line of the active cart,
         calculates the total, and confirms the cart as an order in
         status=pending with the associated Payment Intent.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "201":
           description: Payment intent created
@@ -986,6 +993,93 @@ paths:
           description: Insufficient stock for one or more cart items
         "422":
           description: Empty cart
+
+  # ============================================================
+  # WEBHOOKS
+  # ============================================================
+  # Inbound from Stripe, not from a user of this API: no bearer auth, no /me
+  # or /checkout prefix. Authentication is the Stripe-Signature header instead.
+  /webhooks/stripe:
+    post:
+      tags: [Webhooks]
+      summary: Handle a Stripe event (Stripe)
+      security: []
+      description: >
+        Called by Stripe, not by a client of this API — authenticated by the
+        Stripe-Signature header below instead of a bearer token.
+
+        Handles the only two event types that matter to this contract, the only
+        transitions pending -> paid: checkout.session.completed (Payment Links)
+        and payment_intent.succeeded (Payment Intents). Any other event type is
+        still acknowledged with 200 and ignored — acknowledging unknown types is
+        what stops Stripe from retrying them forever.
+
+        Delivery is at-least-once: Stripe retries a delivery that does not get a
+        2xx response, and a retry can also arrive after a 2xx that was lost in
+        transit. Handling must therefore be idempotent — a replayed
+        payment_intent.succeeded (or checkout.session.completed) for an order
+        that is already paid must not decrement stock a second time or
+        re-trigger the paid transition.
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+          description: >
+            HMAC-SHA256 signature computed by Stripe over the raw request body
+            (t=<timestamp>,v1=<signature>), verified against the endpoint's
+            signing secret before the payload is trusted. This is the request's
+            authentication in place of bearer auth.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, type, data]
+              description: >
+                Deliberately not modeled field-by-field: Stripe's event payloads
+                are wide and this contract only needs enough to route and act on
+                the two handled event types.
+              properties:
+                id:
+                  type: string
+                  description: Stripe event id, e.g. evt_1NG8...
+                type:
+                  type: string
+                  description: >
+                    Event type, e.g. checkout.session.completed or
+                    payment_intent.succeeded. Determines how data.object is
+                    interpreted; every other value is acknowledged and ignored.
+                data:
+                  type: object
+                  required: [object]
+                  properties:
+                    object:
+                      type: object
+                      description: >
+                        The Checkout Session or Payment Intent as it stood at
+                        event time, carrying the order-identifying metadata set
+                        when the Payment Link/Intent was created.
+      responses:
+        "200":
+          description: >
+            Event acknowledged — either handled (order transitioned, stock
+            decremented) or an event type this contract does not act on.
+        "400":
+          description: >
+            Malformed payload, or an invalid/unverifiable Stripe-Signature.
+            Both surface as 400 rather than splitting the signature case into
+            401: signature verification and payload parsing happen in the same
+            try/catch (Stripe SDK's constructEvent), which raises the same
+            error class for a bad signature, an expired timestamp, or an
+            unparsable body — this contract mirrors that instead of inventing a
+            distinction the SDK itself does not make.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   # ============================================================
   # ORDERS
@@ -1183,6 +1277,19 @@ components:
       schema:
         type: string
         format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: >
+        Client-generated id for this checkout attempt (docs/implementation-notes.md
+        §13). Required because POST /checkout/* charges money: a network-timeout
+        retry must not create a second Payment Link/Intent or a second order.
+        Replaying the same key returns the original 201 response (same order,
+        same paymentLink/paymentIntent) instead of creating anything new.
 
   responses:
     BadRequest:
