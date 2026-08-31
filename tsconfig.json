@@ -19,5 +19,5 @@
     "strictPropertyInitialization": false,
     "types": ["vitest/globals", "node", "multer"]
   },
-  "exclude": ["node_modules", "dist", "test/app.e2e-spec.ts"]
+  "exclude": ["node_modules", "dist"]
 }
