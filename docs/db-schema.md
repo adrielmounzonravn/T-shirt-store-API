@@ -173,6 +173,7 @@ Table cart_numbers{
 Table orders{
   order_id uuid [pk]
   cart_number uuid [unique, not null]
+  idempotency_key uuid [unique, not null]
   payment_link text
   payment_intent text
   status Order_Status [not null, default: 'pending']
@@ -184,7 +185,7 @@ Table orders{
     (created_at)
   }
 
-  Note: 'The order owner is reached through cart_number -> cart_numbers.user_id; there is no user_id column here. payment_method is derived from whichever of payment_link/payment_intent is non-null (they are mutually exclusive by construction) and exposed as Order.paymentMethod, computed on read, not stored. Optional hardening: CHECK (num_nonnulls(payment_link, payment_intent) <= 1). total_amount is likewise not stored — it is SUM(unit_price * quantity) over cart_products.'
+  Note: 'The order owner is reached through cart_number -> cart_numbers.user_id; there is no user_id column here. idempotency_key stores the client-generated Idempotency-Key header (openapi.yaml IdempotencyKey component) from the POST /checkout/* call that created this order: a retried request with the same key looks up and returns this row instead of creating a new order or calling Stripe again. payment_method is derived from whichever of payment_link/payment_intent is non-null (they are mutually exclusive by construction) and exposed as Order.paymentMethod, computed on read, not stored. payment_intent stores the Stripe PaymentIntent id (pi_...), never its client_secret — the client_secret is returned once in the POST /checkout/payment-intent response for the frontend to confirm payment and is not persisted. Optional hardening: CHECK (num_nonnulls(payment_link, payment_intent) <= 1). total_amount is likewise not stored — it is SUM(unit_price * quantity) over cart_products.'
 }
 
 Table liked_products {

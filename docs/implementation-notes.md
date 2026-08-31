@@ -177,7 +177,18 @@ challenge §7 — it still needs implementing, in Phase 4 (`docs/week-4-plan.md`
 
 `POST /checkout/payment-link` and `POST /checkout/payment-intent` now require
 an `Idempotency-Key` header (component `IdempotencyKey` in `openapi.yaml`) —
-closes the loose end left open in §13.
+closes the loose end left open in §13. The key is persisted as
+`orders.idempotency_key` (`docs/db-schema.md`, unique): a retried request
+looks up an existing order by that key and returns its original response
+instead of creating a second order or calling Stripe again. The PaymentIntent's
+`client_secret` is returned once in the `POST /checkout/payment-intent`
+response (`clientSecret`) for the frontend to confirm payment with
+Stripe.js/Elements, and is never persisted — only the PaymentIntent id
+(`pi_...`) is stored, in `orders.payment_intent`. Reconciling a Payment-Link
+order against its underlying PaymentIntent (from the webhook's
+`checkout.session.completed` payload) was considered and deliberately left
+out of scope — nothing in the challenge needs refunds or post-payment status
+lookups.
 
 ---
 

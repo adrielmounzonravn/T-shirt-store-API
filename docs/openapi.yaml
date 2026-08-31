@@ -983,8 +983,14 @@ paths:
                 properties:
                   order:
                     $ref: "#/components/schemas/Order"
-                  paymentIntent:
+                  clientSecret:
                     type: string
+                    description: >
+                      The PaymentIntent's client_secret, for the frontend to
+                      confirm the payment with Stripe.js/Elements. Returned
+                      once and never persisted or exposed elsewhere — the
+                      order's underlying PaymentIntent id (pi_...) is stored
+                      server-side instead (docs/db-schema.md orders.payment_intent).
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1288,8 +1294,11 @@ components:
         Client-generated id for this checkout attempt (docs/implementation-notes.md
         §13). Required because POST /checkout/* charges money: a network-timeout
         retry must not create a second Payment Link/Intent or a second order.
-        Replaying the same key returns the original 201 response (same order,
-        same paymentLink/paymentIntent) instead of creating anything new.
+        Stored on the order as orders.idempotency_key (docs/db-schema.md) so a
+        replay is detected by a lookup before calling Stripe: a request whose
+        key matches an existing order returns that order's original 201
+        response (same order, same paymentLink/paymentIntent) instead of
+        creating anything new.
 
   responses:
     BadRequest:
