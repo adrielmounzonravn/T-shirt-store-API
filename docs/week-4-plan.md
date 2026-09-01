@@ -109,8 +109,15 @@ write-up. This closes out `docs/challenge.md`.
 - `test/auth.e2e-spec.ts`: since `.env.test` leaves SMTP blank and
   `MailService` swallows send failures, verification/reset tokens are
   captured via `vi.spyOn` on the app's real `MailService` instance rather
-  than a fake inbox. Skipped a throttle 429 test — `.env.test`'s
-  `THROTTLE_RESET_PASSWORD_LIMIT=1000` is too high to trip deterministically.
+  than a fake inbox.
+- `test/auth-throttle.e2e-spec.ts`: the throttle 429 test skipped earlier
+  now exists in its own file. `AuthController`'s per-route throttle is a
+  module-level constant read from `process.env` at import time, so it can't
+  be changed via `overrideProvider` on a compiled testing module — this
+  file overrides `THROTTLE_RESET_PASSWORD_LIMIT`/`_TTL` in `beforeAll`
+  before a dynamic `import('./e2e/test-app.js')`, relying on Vitest's
+  per-file module isolation to keep that override from leaking into
+  `.env.test`'s shared `1000` limit used by every other e2e file.
 
 ## Phase 1.5 — Real email delivery (SMTP provider)
 
