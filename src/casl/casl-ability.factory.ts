@@ -9,6 +9,7 @@ export type Subjects =
   | 'VariantImage'
   | 'LikedProduct'
   | 'Cart'
+  | 'Order'
   | 'all';
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete';
 export type AppAbility = Ability<[Action, Subjects]>;
@@ -39,6 +40,7 @@ export class CaslAbilityFactory {
       can('create', 'Cart');
       can('update', 'Cart');
       can('delete', 'Cart');
+      can('create', 'Order');
     }
 
     return build();

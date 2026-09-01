@@ -166,12 +166,24 @@ write-up. This closes out `docs/challenge.md`.
 
 ## Phase 3 — Checkout: Payment Links
 
-- [ ] `POST` endpoint to generate a Payment Link for a single product
+- [x] `POST` endpoint to generate a Payment Link for a single product
       (challenge §7A) — order created `pending` before redirecting to Stripe
 - [ ] Unit tests for the service
 - [ ] E2E: single-product checkout happy path through the Payment Link flow
 
 **Notes:**
+- `orders.idempotency_key` was missing from `schema.prisma` (only `db-schema.md`
+  had it) — added via a hand-written migration (`prisma migrate diff` against
+  the running dev DB, since `migrate dev` refuses to run non-interactively).
+- Since Payment Links only accept an existing Stripe `price` id (no inline
+  `price_data` like Checkout Sessions), `CheckoutService` creates an ad hoc
+  Stripe Price from the variant's current price/currency before creating the
+  link, and stores `orderId` in the link's `metadata` for the webhook
+  (Phase 4) to correlate later.
+- `StripeModule`'s client provider falls back to a placeholder key when
+  `STRIPE_SECRET_KEY` is blank (allowed outside production) — the Stripe SDK
+  throws on construction with an empty string, which broke app boot in e2e/dev
+  once a Stripe-dependent module became eagerly imported.
 
 ## Phase 4 — Checkout: Payment Intents and webhook
 

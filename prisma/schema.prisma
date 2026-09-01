@@ -196,11 +196,12 @@ model CartNumber {
 // cartNumber -> CartNumber.userId. paymentMethod and totalAmount are
 // computed on read, not stored (docs/db-schema.md).
 model Order {
-  id            String      @id @default(uuid()) @map("order_id") @db.Uuid
-  cartNumber    String      @unique @map("cart_number") @db.Uuid
-  paymentLink   String?     @map("payment_link")
-  paymentIntent String?     @map("payment_intent")
-  status        OrderStatus @default(pending)
+  id             String      @id @default(uuid()) @map("order_id") @db.Uuid
+  cartNumber     String      @unique @map("cart_number") @db.Uuid
+  idempotencyKey String      @unique @map("idempotency_key") @db.Uuid
+  paymentLink    String?     @map("payment_link")
+  paymentIntent  String?     @map("payment_intent")
+  status         OrderStatus @default(pending)
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
