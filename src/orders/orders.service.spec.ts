@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Test } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { OrdersService } from './orders.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OrderStatus, Role } from '../generated/prisma/enums.js';
@@ -457,6 +461,219 @@ describe('OrdersService', () => {
 
       const argsString = JSON.stringify(
         findOnePrisma.order.findUnique.mock.calls,
+      );
+      expect(argsString).toContain(orderId);
+    });
+  });
+
+  describe('advanceStatus', () => {
+    const orderId = 'order-1';
+
+    const makeCartProduct = (overrides: Record<string, unknown> = {}) => ({
+      skuId: 'sku-1',
+      quantity: 2,
+      unitPrice: 25.5,
+      ...overrides,
+    });
+
+    const makeOrder = (
+      overrides: Record<string, unknown> = {},
+      cartOverrides: Record<string, unknown> = {},
+      cartProducts: Record<string, unknown>[] = [makeCartProduct()],
+    ) => ({
+      id: orderId,
+      cartNumber: 'cart-1',
+      status: OrderStatus.paid,
+      paymentLink: 'https://buy.stripe.com/test',
+      paymentIntent: null,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+      cart: {
+        userId: clientUserId,
+        cartProducts,
+        ...cartOverrides,
+      },
+    });
+
+    const setupAdvance = async (
+      findUniqueReturn: Record<string, unknown> | null,
+      updateReturn: Record<string, unknown> | null = findUniqueReturn,
+    ) => {
+      const advancePrisma = {
+        order: {
+          findUnique: vi.fn().mockResolvedValue(findUniqueReturn),
+          update: vi.fn().mockResolvedValue(updateReturn),
+        },
+      };
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(advancePrisma)
+        .compile();
+
+      return {
+        service: moduleRef.get(OrdersService),
+        prisma: advancePrisma,
+      };
+    };
+
+    it('throws NotFoundException when no order exists with the given id, and does not call update', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(null);
+
+      await expect(
+        service.advanceStatus(orderId, OrderStatus.processing),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(advancePrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('allows the paid -> processing transition and persists the new status', async () => {
+      const updatedOrder = makeOrder({
+        status: OrderStatus.processing,
+        updatedAt: new Date('2024-06-02T00:00:00.000Z'),
+      });
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.paid }),
+        updatedOrder,
+      );
+
+      const result = await service.advanceStatus(
+        orderId,
+        OrderStatus.processing,
+      );
+
+      expect(advancePrisma.order.update).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(
+        expect.objectContaining({
+          orderId,
+          userId: clientUserId,
+          status: OrderStatus.processing,
+        }),
+      );
+    });
+
+    it('allows the processing -> shipped transition and persists the new status', async () => {
+      const updatedOrder = makeOrder({
+        status: OrderStatus.shipped,
+        updatedAt: new Date('2024-06-03T00:00:00.000Z'),
+      });
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.processing }),
+        updatedOrder,
+      );
+
+      const result = await service.advanceStatus(orderId, OrderStatus.shipped);
+
+      expect(advancePrisma.order.update).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(
+        expect.objectContaining({
+          orderId,
+          userId: clientUserId,
+          status: OrderStatus.shipped,
+        }),
+      );
+    });
+
+    it.each([
+      [OrderStatus.pending, OrderStatus.processing],
+      [OrderStatus.paid, OrderStatus.shipped],
+      [OrderStatus.shipped, OrderStatus.shipped],
+      [OrderStatus.cancelled, OrderStatus.processing],
+      [OrderStatus.processing, OrderStatus.processing],
+    ])(
+      'throws UnprocessableEntityException for %s -> %s and does not call update',
+      async (currentStatus, requestedStatus) => {
+        const { service, prisma: advancePrisma } = await setupAdvance(
+          makeOrder({ status: currentStatus }),
+        );
+
+        await expect(
+          service.advanceStatus(orderId, requestedStatus),
+        ).rejects.toBeInstanceOf(UnprocessableEntityException);
+        expect(advancePrisma.order.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it('computes totalAmount from unitPrice * quantity across all cart items', async () => {
+      const cartProducts = [
+        makeCartProduct({ skuId: 'sku-1', quantity: 2, unitPrice: 25.5 }),
+        makeCartProduct({ skuId: 'sku-2', quantity: 3, unitPrice: 10 }),
+      ];
+      const updatedOrder = makeOrder(
+        { status: OrderStatus.processing },
+        {},
+        cartProducts,
+      );
+      const { service } = await setupAdvance(
+        makeOrder({ status: OrderStatus.paid }, {}, cartProducts),
+        updatedOrder,
+      );
+
+      const result = await service.advanceStatus(
+        orderId,
+        OrderStatus.processing,
+      );
+
+      expect(result.totalAmount).toBe(25.5 * 2 + 10 * 3);
+    });
+
+    it('derives payment_link when paymentLink is set', async () => {
+      const updatedOrder = makeOrder({
+        status: OrderStatus.processing,
+        paymentLink: 'https://buy.stripe.com/x',
+        paymentIntent: null,
+      });
+      const { service } = await setupAdvance(
+        makeOrder({
+          status: OrderStatus.paid,
+          paymentLink: 'https://buy.stripe.com/x',
+          paymentIntent: null,
+        }),
+        updatedOrder,
+      );
+
+      const result = await service.advanceStatus(
+        orderId,
+        OrderStatus.processing,
+      );
+
+      expect(result.paymentMethod).toBe('payment_link');
+    });
+
+    it('derives payment_intent when paymentLink is null', async () => {
+      const updatedOrder = makeOrder({
+        status: OrderStatus.processing,
+        paymentLink: null,
+        paymentIntent: 'pi_123',
+      });
+      const { service } = await setupAdvance(
+        makeOrder({
+          status: OrderStatus.paid,
+          paymentLink: null,
+          paymentIntent: 'pi_123',
+        }),
+        updatedOrder,
+      );
+
+      const result = await service.advanceStatus(
+        orderId,
+        OrderStatus.processing,
+      );
+
+      expect(result.paymentMethod).toBe('payment_intent');
+    });
+
+    it('passes the requested orderId to prisma.order.findUnique', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.paid }),
+      );
+
+      await service.advanceStatus(orderId, OrderStatus.processing);
+
+      const argsString = JSON.stringify(
+        advancePrisma.order.findUnique.mock.calls,
       );
       expect(argsString).toContain(orderId);
     });

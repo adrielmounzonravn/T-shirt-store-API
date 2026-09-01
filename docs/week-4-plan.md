@@ -241,7 +241,7 @@ write-up. This closes out `docs/challenge.md`.
       (challenge §9)
 - [x] Order detail (products, quantities, prices, payment method, total,
       status)
-- [ ] Manager: advance status `paid → processing → shipped`
+- [x] Manager: advance status `paid → processing → shipped`
 - [ ] Client: cancel before `shipped`
 - [ ] Unit tests for the service
 - [ ] E2E: order history filters/pagination, status advance, cancel-before-

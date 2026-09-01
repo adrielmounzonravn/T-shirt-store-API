@@ -2,18 +2,27 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
-import { Role } from '../generated/prisma/enums.js';
+import { OrderStatus, Role } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { JwtPayload } from '../auth/jwt-payload.interface.js';
 import type { ListOrdersQueryDto } from './dto/list-orders-query.dto.js';
+import type { AdvanceableOrderStatus } from './dto/advance-order-status.dto.js';
 import {
   OrderEntity,
   PaymentMethod,
 } from '../checkout/entities/order.entity.js';
 import { OrderListEntity } from './entities/order-list.entity.js';
 import { OrderDetailEntity } from './entities/order-detail.entity.js';
+
+const ALLOWED_STATUS_ADVANCES: Partial<
+  Record<OrderStatus, AdvanceableOrderStatus>
+> = {
+  [OrderStatus.paid]: OrderStatus.processing,
+  [OrderStatus.processing]: OrderStatus.shipped,
+};
 
 interface OrderRow {
   id: string;
@@ -175,5 +184,49 @@ export class OrdersService {
         unitPrice: Number(item.unitPrice),
       })),
     );
+  }
+
+  async advanceStatus(
+    orderId: string,
+    status: AdvanceableOrderStatus,
+  ): Promise<OrderEntity> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        cart: {
+          include: { cartProducts: true },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    if (ALLOWED_STATUS_ADVANCES[order.status] !== status) {
+      throw new UnprocessableEntityException('State transition not allowed');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status },
+    });
+
+    const totalAmount = order.cart.cartProducts.reduce(
+      (sum, item) => sum + Number(item.unitPrice) * item.quantity,
+      0,
+    );
+
+    return new OrderEntity({
+      id: updated.id,
+      cartNumber: updated.cartNumber,
+      userId: order.cart.userId,
+      status: updated.status,
+      paymentMethod: updated.paymentLink
+        ? PaymentMethod.payment_link
+        : PaymentMethod.payment_intent,
+      totalAmount,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+    });
   }
 }

@@ -32,6 +32,7 @@ export class CaslAbilityFactory {
       can('manage', 'ProductImage');
       can('manage', 'VariantImage');
       can('read', 'Order');
+      can('update', 'Order');
     } else {
       can('read', 'Product');
       can('read', 'ProductVariant');

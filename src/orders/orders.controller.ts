@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -13,8 +21,10 @@ import { PoliciesGuard } from '../casl/guards/policies.guard.js';
 import { CheckPolicies } from '../casl/decorators/check-policies.decorator.js';
 import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator.js';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto.js';
+import { AdvanceOrderStatusDto } from './dto/advance-order-status.dto.js';
 import { OrderListEntity } from './entities/order-list.entity.js';
 import { OrderDetailEntity } from './entities/order-detail.entity.js';
+import { OrderEntity } from '../checkout/entities/order.entity.js';
 import { OrdersService } from './orders.service.js';
 
 @ApiTags('Orders')
@@ -67,5 +77,27 @@ export class OrdersController {
     @CurrentUser() user: JwtPayload,
   ): Promise<OrderDetailEntity> {
     return this.ordersService.findOne(orderId, user);
+  }
+
+  @Patch(':orderId/status')
+  @ApiParam({ name: 'orderId', format: 'uuid' })
+  @CheckPolicies((ability) => ability.can('update', 'Order'))
+  @ApiOperation({
+    summary: 'Advance order status (Manager)',
+    description:
+      'Manager can advance paid → processing → shipped. Transitions ' +
+      'outside the allowed flow return 422.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Status updated',
+    type: OrderEntity,
+  })
+  @ApiErrorResponses(401, 403, 404, 422)
+  advanceStatus(
+    @Param('orderId') orderId: string,
+    @Body() dto: AdvanceOrderStatusDto,
+  ): Promise<OrderEntity> {
+    return this.ordersService.advanceStatus(orderId, dto.status);
   }
 }
