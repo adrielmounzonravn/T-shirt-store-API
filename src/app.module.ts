@@ -14,6 +14,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { CaslModule } from './casl/casl.module.js';
 import { ProductsModule } from './products/products.module.js';
 import { VariantsModule } from './variants/variants.module.js';
+import { LikedProductsModule } from './liked-products/liked-products.module.js';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { VariantsModule } from './variants/variants.module.js';
     CaslModule,
     ProductsModule,
     VariantsModule,
+    LikedProductsModule,
   ],
   controllers: [AppController],
   providers: [

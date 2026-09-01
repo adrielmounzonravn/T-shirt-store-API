@@ -3,7 +3,12 @@ import { Ability, AbilityBuilder, type AbilityClass } from '@casl/ability';
 import { Role } from '../generated/prisma/enums.js';
 
 export type Subjects =
-  'Product' | 'ProductVariant' | 'ProductImage' | 'VariantImage' | 'all';
+  | 'Product'
+  | 'ProductVariant'
+  | 'ProductImage'
+  | 'VariantImage'
+  | 'LikedProduct'
+  | 'all';
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete';
 export type AppAbility = Ability<[Action, Subjects]>;
 
@@ -27,6 +32,8 @@ export class CaslAbilityFactory {
     } else {
       can('read', 'Product');
       can('read', 'ProductVariant');
+      can('create', 'LikedProduct');
+      can('delete', 'LikedProduct');
     }
 
     return build();
