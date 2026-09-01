@@ -121,15 +121,15 @@ write-up. This closes out `docs/challenge.md`.
 
 ## Phase 1.5 — Real email delivery (SMTP provider)
 
-- [ ] Sign up for a free Mailtrap account, create a Sandbox inbox, and copy
+- [x] Sign up for a free Mailtrap account, create a Sandbox inbox, and copy
       its SMTP credentials
-- [ ] Set `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD` in the local
+- [x] Set `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD` in the local
       `.env` (not `.env.test` — e2e keeps empty placeholders on purpose, see
       Phase 0 notes)
-- [ ] Manually trigger the three email flows that already exist — sign-up
+- [x] Manually trigger the three email flows that already exist — sign-up
       (verification), forgot-password, and password-change — through the
       running app and confirm all three land in the Mailtrap Sandbox inbox
-- [ ] Document the chosen provider in `implementation-notes.md` §4 (settled
+- [x] Document the chosen provider in `implementation-notes.md` §4 (settled
       decisions) so it isn't re-litigated later
 
 **Notes:**
