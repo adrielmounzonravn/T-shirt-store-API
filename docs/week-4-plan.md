@@ -239,7 +239,7 @@ write-up. This closes out `docs/challenge.md`.
 
 - [x] Order history: filters (date range, status, price range) + pagination
       (challenge §9)
-- [ ] Order detail (products, quantities, prices, payment method, total,
+- [x] Order detail (products, quantities, prices, payment method, total,
       status)
 - [ ] Manager: advance status `paid → processing → shipped`
 - [ ] Client: cancel before `shipped`

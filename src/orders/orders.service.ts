@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
 import { Role } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -9,6 +13,7 @@ import {
   PaymentMethod,
 } from '../checkout/entities/order.entity.js';
 import { OrderListEntity } from './entities/order-list.entity.js';
+import { OrderDetailEntity } from './entities/order-detail.entity.js';
 
 interface OrderRow {
   id: string;
@@ -116,5 +121,59 @@ export class OrdersService {
       })),
       pagination: { limit, offset, total: count },
     });
+  }
+
+  async findOne(orderId: string, user: JwtPayload): Promise<OrderDetailEntity> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        cart: {
+          include: {
+            cartProducts: {
+              include: { variant: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    if (user.role !== Role.manager && order.cart.userId !== user.sub) {
+      throw new ForbiddenException('You do not have access to this order');
+    }
+
+    const totalAmount = order.cart.cartProducts.reduce(
+      (sum, item) => sum + Number(item.unitPrice) * item.quantity,
+      0,
+    );
+
+    return new OrderDetailEntity(
+      {
+        id: order.id,
+        cartNumber: order.cartNumber,
+        userId: order.cart.userId,
+        status: order.status,
+        paymentMethod: order.paymentLink
+          ? PaymentMethod.payment_link
+          : PaymentMethod.payment_intent,
+        totalAmount,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+      },
+      order.cart.cartProducts.map((item) => ({
+        skuId: item.skuId,
+        variant: {
+          productId: item.variant.productId,
+          size: item.variant.size,
+          color: item.variant.color,
+          fit: item.variant.fit,
+          gender: item.variant.gender,
+        },
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+      })),
+    );
   }
 }

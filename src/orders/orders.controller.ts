@@ -1,7 +1,8 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -13,6 +14,7 @@ import { CheckPolicies } from '../casl/decorators/check-policies.decorator.js';
 import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator.js';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto.js';
 import { OrderListEntity } from './entities/order-list.entity.js';
+import { OrderDetailEntity } from './entities/order-detail.entity.js';
 import { OrdersService } from './orders.service.js';
 
 @ApiTags('Orders')
@@ -42,5 +44,28 @@ export class OrdersController {
     @CurrentUser() user: JwtPayload,
   ): Promise<OrderListEntity> {
     return this.ordersService.findMany(query, user);
+  }
+
+  @Get(':orderId')
+  @ApiParam({ name: 'orderId', format: 'uuid' })
+  @CheckPolicies((ability) => ability.can('read', 'Order'))
+  @ApiOperation({
+    summary: 'Get order detail',
+    description:
+      'Includes the purchased products (with quantities and individual ' +
+      'prices frozen at purchase time), payment method, total amount paid, ' +
+      'and status.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Order detail',
+    type: OrderDetailEntity,
+  })
+  @ApiErrorResponses(401, 403, 404)
+  findOne(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<OrderDetailEntity> {
+    return this.ordersService.findOne(orderId, user);
   }
 }
