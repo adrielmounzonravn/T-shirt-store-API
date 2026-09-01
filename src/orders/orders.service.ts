@@ -24,6 +24,12 @@ const ALLOWED_STATUS_ADVANCES: Partial<
   [OrderStatus.processing]: OrderStatus.shipped,
 };
 
+const CANCELLABLE_STATUSES: OrderStatus[] = [
+  OrderStatus.pending,
+  OrderStatus.paid,
+  OrderStatus.processing,
+];
+
 interface OrderRow {
   id: string;
   cartNumber: string;
@@ -209,6 +215,52 @@ export class OrdersService {
     const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { status },
+    });
+
+    const totalAmount = order.cart.cartProducts.reduce(
+      (sum, item) => sum + Number(item.unitPrice) * item.quantity,
+      0,
+    );
+
+    return new OrderEntity({
+      id: updated.id,
+      cartNumber: updated.cartNumber,
+      userId: order.cart.userId,
+      status: updated.status,
+      paymentMethod: updated.paymentLink
+        ? PaymentMethod.payment_link
+        : PaymentMethod.payment_intent,
+      totalAmount,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+    });
+  }
+
+  async cancel(orderId: string, user: JwtPayload): Promise<OrderEntity> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        cart: {
+          include: { cartProducts: true },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    if (order.cart.userId !== user.sub) {
+      throw new ForbiddenException('You do not have access to this order');
+    }
+    if (!CANCELLABLE_STATUSES.includes(order.status)) {
+      throw new UnprocessableEntityException(
+        'The order has already been shipped and cannot be cancelled',
+      );
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.cancelled },
     });
 
     const totalAmount = order.cart.cartProducts.reduce(

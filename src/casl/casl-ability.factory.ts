@@ -11,7 +11,8 @@ export type Subjects =
   | 'Cart'
   | 'Order'
   | 'all';
-export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete';
+export type Action =
+  'manage' | 'create' | 'read' | 'update' | 'delete' | 'cancel';
 export type AppAbility = Ability<[Action, Subjects]>;
 
 export interface AbilityUser {
@@ -44,6 +45,7 @@ export class CaslAbilityFactory {
       can('delete', 'Cart');
       can('create', 'Order');
       can('read', 'Order');
+      can('cancel', 'Order');
     }
 
     return build();

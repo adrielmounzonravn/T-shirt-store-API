@@ -678,4 +678,197 @@ describe('OrdersService', () => {
       expect(argsString).toContain(orderId);
     });
   });
+
+  describe('cancel', () => {
+    const orderId = 'order-1';
+
+    const makeCartProduct = (overrides: Record<string, unknown> = {}) => ({
+      skuId: 'sku-1',
+      quantity: 2,
+      unitPrice: 25.5,
+      ...overrides,
+    });
+
+    const makeOrder = (
+      overrides: Record<string, unknown> = {},
+      cartOverrides: Record<string, unknown> = {},
+      cartProducts: Record<string, unknown>[] = [makeCartProduct()],
+    ) => ({
+      id: orderId,
+      cartNumber: 'cart-1',
+      status: OrderStatus.pending,
+      paymentLink: 'https://buy.stripe.com/test',
+      paymentIntent: null,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+      cart: {
+        userId: clientUserId,
+        cartProducts,
+        ...cartOverrides,
+      },
+    });
+
+    const setupCancel = async (
+      findUniqueReturn: Record<string, unknown> | null,
+      updateReturn: Record<string, unknown> | null = findUniqueReturn,
+    ) => {
+      const cancelPrisma = {
+        order: {
+          findUnique: vi.fn().mockResolvedValue(findUniqueReturn),
+          update: vi.fn().mockResolvedValue(updateReturn),
+        },
+      };
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(cancelPrisma)
+        .compile();
+
+      return {
+        service: moduleRef.get(OrdersService),
+        prisma: cancelPrisma,
+      };
+    };
+
+    it('throws NotFoundException when no order exists with the given id, and does not call update', async () => {
+      const { service, prisma: cancelPrisma } = await setupCancel(null);
+
+      await expect(service.cancel(orderId, clientUser)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(cancelPrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when a client cancels an order they do not own, and does not call update', async () => {
+      const { service, prisma: cancelPrisma } = await setupCancel(
+        makeOrder({}, { userId: otherUserId }),
+      );
+
+      await expect(service.cancel(orderId, clientUser)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(cancelPrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it.each([[OrderStatus.shipped], [OrderStatus.cancelled]])(
+      'throws UnprocessableEntityException when status is %s, and does not call update',
+      async (currentStatus) => {
+        const { service, prisma: cancelPrisma } = await setupCancel(
+          makeOrder({ status: currentStatus }),
+        );
+
+        await expect(
+          service.cancel(orderId, clientUser),
+        ).rejects.toBeInstanceOf(UnprocessableEntityException);
+        expect(cancelPrisma.order.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      [OrderStatus.pending],
+      [OrderStatus.paid],
+      [OrderStatus.processing],
+    ])(
+      'cancels an order in %s status and returns it with status cancelled',
+      async (currentStatus) => {
+        const updatedOrder = makeOrder({
+          status: OrderStatus.cancelled,
+          updatedAt: new Date('2024-06-04T00:00:00.000Z'),
+        });
+        const { service, prisma: cancelPrisma } = await setupCancel(
+          makeOrder({ status: currentStatus }),
+          updatedOrder,
+        );
+
+        const result = await service.cancel(orderId, clientUser);
+
+        expect(cancelPrisma.order.update).toHaveBeenCalledTimes(1);
+        expect(result).toEqual(
+          expect.objectContaining({
+            orderId,
+            cartNumber: 'cart-1',
+            userId: clientUserId,
+            status: OrderStatus.cancelled,
+            createdAt: now,
+          }),
+        );
+      },
+    );
+
+    it('computes totalAmount from unitPrice * quantity across all cart items', async () => {
+      const cartProducts = [
+        makeCartProduct({ skuId: 'sku-1', quantity: 2, unitPrice: 25.5 }),
+        makeCartProduct({ skuId: 'sku-2', quantity: 3, unitPrice: 10 }),
+      ];
+      const updatedOrder = makeOrder(
+        { status: OrderStatus.cancelled },
+        {},
+        cartProducts,
+      );
+      const { service } = await setupCancel(
+        makeOrder({ status: OrderStatus.pending }, {}, cartProducts),
+        updatedOrder,
+      );
+
+      const result = await service.cancel(orderId, clientUser);
+
+      expect(result.totalAmount).toBe(25.5 * 2 + 10 * 3);
+    });
+
+    it('derives payment_link when paymentLink is set', async () => {
+      const updatedOrder = makeOrder({
+        status: OrderStatus.cancelled,
+        paymentLink: 'https://buy.stripe.com/x',
+        paymentIntent: null,
+      });
+      const { service } = await setupCancel(
+        makeOrder({
+          status: OrderStatus.pending,
+          paymentLink: 'https://buy.stripe.com/x',
+          paymentIntent: null,
+        }),
+        updatedOrder,
+      );
+
+      const result = await service.cancel(orderId, clientUser);
+
+      expect(result.paymentMethod).toBe('payment_link');
+    });
+
+    it('derives payment_intent when paymentLink is null', async () => {
+      const updatedOrder = makeOrder({
+        status: OrderStatus.cancelled,
+        paymentLink: null,
+        paymentIntent: 'pi_123',
+      });
+      const { service } = await setupCancel(
+        makeOrder({
+          status: OrderStatus.pending,
+          paymentLink: null,
+          paymentIntent: 'pi_123',
+        }),
+        updatedOrder,
+      );
+
+      const result = await service.cancel(orderId, clientUser);
+
+      expect(result.paymentMethod).toBe('payment_intent');
+    });
+
+    it('passes the requested orderId to prisma.order.findUnique', async () => {
+      const { service, prisma: cancelPrisma } = await setupCancel(
+        makeOrder({ status: OrderStatus.pending }),
+      );
+
+      await service.cancel(orderId, clientUser);
+
+      const argsString = JSON.stringify(
+        cancelPrisma.order.findUnique.mock.calls,
+      );
+      expect(argsString).toContain(orderId);
+    });
+  });
 });

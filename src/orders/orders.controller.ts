@@ -100,4 +100,24 @@ export class OrdersController {
   ): Promise<OrderEntity> {
     return this.ordersService.advanceStatus(orderId, dto.status);
   }
+
+  @Patch(':orderId/cancel')
+  @ApiParam({ name: 'orderId', format: 'uuid' })
+  @CheckPolicies((ability) => ability.can('cancel', 'Order'))
+  @ApiOperation({
+    summary: 'Cancel own order (Client)',
+    description: 'Only allowed before the order reaches shipped.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Order cancelled',
+    type: OrderEntity,
+  })
+  @ApiErrorResponses(401, 403, 404, 422)
+  cancel(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<OrderEntity> {
+    return this.ordersService.cancel(orderId, user);
+  }
 }

@@ -242,8 +242,8 @@ write-up. This closes out `docs/challenge.md`.
 - [x] Order detail (products, quantities, prices, payment method, total,
       status)
 - [x] Manager: advance status `paid → processing → shipped`
-- [ ] Client: cancel before `shipped`
-- [ ] Unit tests for the service
+- [x] Client: cancel before `shipped`
+- [x] Unit tests for the service
 - [ ] E2E: order history filters/pagination, status advance, cancel-before-
       shipped rejection after `shipped`
 
@@ -254,6 +254,13 @@ write-up. This closes out `docs/challenge.md`.
   `$queryRaw` (GROUP BY + HAVING) instead of the persisted-`total_amount`
   fallback `implementation-notes.md` §4 mentions, since the raw query wasn't
   actually awkward once written.
+- `PATCH /orders/:orderId/cancel`: added a dedicated `cancel` CASL action
+  (granted to clients only) instead of reusing `update` — `PoliciesGuard`
+  checks `ability.can(action, 'Order')` by subject type only, with no
+  instance, so a shared `update` action would let clients hit the
+  manager-only `/status` endpoint too. Ownership (`cart.userId === user.sub`)
+  and the shipped/cancelled 422 check are enforced in `OrdersService.cancel`,
+  same pattern as `findOne`'s ownership check.
 
 ## Phase 6 — Stock notification job
 
