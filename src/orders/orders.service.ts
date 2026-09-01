@@ -1,0 +1,120 @@
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '../generated/prisma/client.js';
+import { Role } from '../generated/prisma/enums.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import type { JwtPayload } from '../auth/jwt-payload.interface.js';
+import type { ListOrdersQueryDto } from './dto/list-orders-query.dto.js';
+import {
+  OrderEntity,
+  PaymentMethod,
+} from '../checkout/entities/order.entity.js';
+import { OrderListEntity } from './entities/order-list.entity.js';
+
+interface OrderRow {
+  id: string;
+  cartNumber: string;
+  userId: string;
+  status: string;
+  paymentLink: string | null;
+  paymentIntent: string | null;
+  totalAmount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+@Injectable()
+export class OrdersService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findMany(
+    query: ListOrdersQueryDto,
+    user: JwtPayload,
+  ): Promise<OrderListEntity> {
+    const { limit, offset, dateFrom, dateTo, status, minPrice, maxPrice } =
+      query;
+    const isManager = user.role === Role.manager;
+    const targetUserId = isManager ? query.userId : user.sub;
+
+    const conditions: Prisma.Sql[] = [];
+    if (targetUserId) {
+      conditions.push(Prisma.sql`cn.user_id = ${targetUserId}::uuid`);
+    }
+    if (dateFrom) {
+      conditions.push(Prisma.sql`o.created_at >= ${new Date(dateFrom)}`);
+    }
+    if (dateTo) {
+      conditions.push(Prisma.sql`o.created_at <= ${new Date(dateTo)}`);
+    }
+    if (status) {
+      conditions.push(Prisma.sql`o.status = ${status}::"OrderStatus"`);
+    }
+    const where = conditions.length
+      ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`
+      : Prisma.empty;
+
+    const havingConditions: Prisma.Sql[] = [];
+    if (minPrice !== undefined) {
+      havingConditions.push(
+        Prisma.sql`COALESCE(SUM(cp.unit_price * cp.quantity), 0) >= ${minPrice}`,
+      );
+    }
+    if (maxPrice !== undefined) {
+      havingConditions.push(
+        Prisma.sql`COALESCE(SUM(cp.unit_price * cp.quantity), 0) <= ${maxPrice}`,
+      );
+    }
+    const having = havingConditions.length
+      ? Prisma.sql`HAVING ${Prisma.join(havingConditions, ' AND ')}`
+      : Prisma.empty;
+
+    const rows = await this.prisma.$queryRaw<OrderRow[]>(Prisma.sql`
+      SELECT o.order_id AS "id",
+             o.cart_number AS "cartNumber",
+             cn.user_id AS "userId",
+             o.status AS "status",
+             o.payment_link AS "paymentLink",
+             o.payment_intent AS "paymentIntent",
+             o.created_at AS "createdAt",
+             o.updated_at AS "updatedAt",
+             COALESCE(SUM(cp.unit_price * cp.quantity), 0)::float AS "totalAmount"
+      FROM orders o
+      JOIN cart_numbers cn ON cn.cart_number = o.cart_number
+      LEFT JOIN cart_products cp ON cp.cart_number = o.cart_number
+      ${where}
+      GROUP BY o.order_id, cn.user_id
+      ${having}
+      ORDER BY o.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+
+    const [{ count }] = await this.prisma.$queryRaw<{ count: number }[]>(
+      Prisma.sql`
+        SELECT COUNT(*)::int AS count FROM (
+          SELECT o.order_id
+          FROM orders o
+          JOIN cart_numbers cn ON cn.cart_number = o.cart_number
+          LEFT JOIN cart_products cp ON cp.cart_number = o.cart_number
+          ${where}
+          GROUP BY o.order_id
+          ${having}
+        ) sub
+      `,
+    );
+
+    return new OrderListEntity({
+      data: rows.map((row) => ({
+        id: row.id,
+        cartNumber: row.cartNumber,
+        userId: row.userId,
+        status: row.status as OrderEntity['status'],
+        paymentMethod: row.paymentLink
+          ? PaymentMethod.payment_link
+          : PaymentMethod.payment_intent,
+        totalAmount: row.totalAmount,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      })),
+      pagination: { limit, offset, total: count },
+    });
+  }
+}

@@ -237,7 +237,7 @@ write-up. This closes out `docs/challenge.md`.
 
 ## Phase 5 — Orders
 
-- [ ] Order history: filters (date range, status, price range) + pagination
+- [x] Order history: filters (date range, status, price range) + pagination
       (challenge §9)
 - [ ] Order detail (products, quantities, prices, payment method, total,
       status)
@@ -248,6 +248,12 @@ write-up. This closes out `docs/challenge.md`.
       shipped rejection after `shipped`
 
 **Notes:**
+- `GET /orders`: `minPrice`/`maxPrice` filter on the computed `totalAmount`
+  (`SUM(unit_price * quantity)` over `cart_products`), which Prisma's query
+  builder can't filter/paginate on directly — `OrdersService.findMany` uses
+  `$queryRaw` (GROUP BY + HAVING) instead of the persisted-`total_amount`
+  fallback `implementation-notes.md` §4 mentions, since the raw query wasn't
+  actually awkward once written.
 
 ## Phase 6 — Stock notification job
 

@@ -31,6 +31,7 @@ export class CaslAbilityFactory {
       can('manage', 'ProductVariant');
       can('manage', 'ProductImage');
       can('manage', 'VariantImage');
+      can('read', 'Order');
     } else {
       can('read', 'Product');
       can('read', 'ProductVariant');
@@ -41,6 +42,7 @@ export class CaslAbilityFactory {
       can('update', 'Cart');
       can('delete', 'Cart');
       can('create', 'Order');
+      can('read', 'Order');
     }
 
     return build();
