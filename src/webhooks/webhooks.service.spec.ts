@@ -13,6 +13,13 @@ describe('WebhooksService', () => {
     order: {
       update: ReturnType<typeof vi.fn>;
       updateMany: ReturnType<typeof vi.fn>;
+      findUniqueOrThrow: ReturnType<typeof vi.fn>;
+    };
+    cartProduct: {
+      findMany: ReturnType<typeof vi.fn>;
+    };
+    productVariant: {
+      update: ReturnType<typeof vi.fn>;
     };
   };
   let configService: { getOrThrow: ReturnType<typeof vi.fn> };
@@ -76,12 +83,20 @@ describe('WebhooksService', () => {
           .fn()
           .mockResolvedValue({ id: orderId, status: OrderStatus.paid }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ cartNumber: 'cart-1' }),
+      },
+      cartProduct: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      productVariant: {
+        update: vi.fn().mockResolvedValue({ stock: 10 }),
       },
     };
 
     configService = {
       getOrThrow: vi.fn().mockImplementation((key: string) => {
         if (key === 'stripe.webhookSecret') return webhookSecret;
+        if (key === 'lowStockThreshold') return 3;
         return undefined;
       }),
     };
@@ -247,6 +262,110 @@ describe('WebhooksService', () => {
       ).resolves.toBeUndefined();
       expect(prisma.order.update).not.toHaveBeenCalled();
       expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('stock decrement on pending -> paid transition', () => {
+    it('looks up the order cartNumber, fetches its line items, and decrements stock for each', async () => {
+      stripe.webhooks.constructEvent.mockReturnValue(
+        makeCheckoutSessionEvent(),
+      );
+      prisma.order.findUniqueOrThrow.mockResolvedValue({
+        cartNumber: 'cart-42',
+      });
+      prisma.cartProduct.findMany.mockResolvedValue([
+        { skuId: 'sku-1', quantity: 2 },
+      ]);
+
+      await service.handleStripeEvent(rawBody, signature);
+
+      expect(prisma.order.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: orderId },
+        select: { cartNumber: true },
+      });
+      expect(prisma.cartProduct.findMany).toHaveBeenCalledWith({
+        where: { cartNumber: 'cart-42' },
+        select: { skuId: true, quantity: true },
+      });
+      expect(prisma.productVariant.update).toHaveBeenCalledTimes(1);
+      expect(prisma.productVariant.update).toHaveBeenCalledWith({
+        where: { id: 'sku-1' },
+        data: { stock: { decrement: 2 } },
+        select: { stock: true },
+      });
+    });
+
+    it('decrements stock independently for every line item in the order', async () => {
+      stripe.webhooks.constructEvent.mockReturnValue(makePaymentIntentEvent());
+      prisma.cartProduct.findMany.mockResolvedValue([
+        { skuId: 'sku-1', quantity: 1 },
+        { skuId: 'sku-2', quantity: 3 },
+        { skuId: 'sku-3', quantity: 5 },
+      ]);
+
+      await service.handleStripeEvent(rawBody, signature);
+
+      expect(prisma.productVariant.update).toHaveBeenCalledTimes(3);
+      expect(prisma.productVariant.update).toHaveBeenNthCalledWith(1, {
+        where: { id: 'sku-1' },
+        data: { stock: { decrement: 1 } },
+        select: { stock: true },
+      });
+      expect(prisma.productVariant.update).toHaveBeenNthCalledWith(2, {
+        where: { id: 'sku-2' },
+        data: { stock: { decrement: 3 } },
+        select: { stock: true },
+      });
+      expect(prisma.productVariant.update).toHaveBeenNthCalledWith(3, {
+        where: { id: 'sku-3' },
+        data: { stock: { decrement: 5 } },
+        select: { stock: true },
+      });
+    });
+
+    it('reads the configured low-stock threshold when a transition happens', async () => {
+      stripe.webhooks.constructEvent.mockReturnValue(
+        makeCheckoutSessionEvent(),
+      );
+      prisma.cartProduct.findMany.mockResolvedValue([
+        { skuId: 'sku-1', quantity: 1 },
+      ]);
+
+      await service.handleStripeEvent(rawBody, signature);
+
+      expect(configService.getOrThrow).toHaveBeenCalledWith(
+        'lowStockThreshold',
+      );
+    });
+
+    it('resolves without throwing when a decremented variant lands exactly on the low-stock threshold', async () => {
+      stripe.webhooks.constructEvent.mockReturnValue(
+        makeCheckoutSessionEvent(),
+      );
+      prisma.cartProduct.findMany.mockResolvedValue([
+        { skuId: 'sku-1', quantity: 7 },
+      ]);
+      prisma.productVariant.update.mockResolvedValue({ stock: 3 });
+
+      await expect(
+        service.handleStripeEvent(rawBody, signature),
+      ).resolves.toBeUndefined();
+    });
+
+    it('does not look up the order, fetch line items, or decrement stock on an idempotent replay', async () => {
+      stripe.webhooks.constructEvent.mockReturnValue(
+        makeCheckoutSessionEvent(),
+      );
+      prisma.order.updateMany.mockResolvedValue({ count: 0 });
+      prisma.order.update.mockRejectedValue(
+        new Error('Record to update not found'),
+      );
+
+      await service.handleStripeEvent(rawBody, signature);
+
+      expect(prisma.order.findUniqueOrThrow).not.toHaveBeenCalled();
+      expect(prisma.cartProduct.findMany).not.toHaveBeenCalled();
+      expect(prisma.productVariant.update).not.toHaveBeenCalled();
     });
   });
 

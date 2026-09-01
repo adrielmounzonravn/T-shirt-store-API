@@ -54,9 +54,42 @@ export class WebhooksService {
       return;
     }
 
-    await this.prisma.order.updateMany({
+    const { count } = await this.prisma.order.updateMany({
       where: { id: orderId, status: OrderStatus.pending },
       data: { status: OrderStatus.paid },
     });
+
+    if (count > 0) {
+      await this.decrementStock(orderId);
+    }
+  }
+
+  private async decrementStock(orderId: string): Promise<void> {
+    const order = await this.prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { cartNumber: true },
+    });
+
+    const cartProducts = await this.prisma.cartProduct.findMany({
+      where: { cartNumber: order.cartNumber },
+      select: { skuId: true, quantity: true },
+    });
+
+    const lowStockThreshold =
+      this.configService.getOrThrow<number>('lowStockThreshold');
+
+    for (const { skuId, quantity } of cartProducts) {
+      const variant = await this.prisma.productVariant.update({
+        where: { id: skuId },
+        data: { stock: { decrement: quantity } },
+        select: { stock: true },
+      });
+
+      if (variant.stock === lowStockThreshold) {
+        this.logger.log(
+          `Variant ${skuId} reached the low-stock threshold (${lowStockThreshold})`,
+        );
+      }
+    }
   }
 }

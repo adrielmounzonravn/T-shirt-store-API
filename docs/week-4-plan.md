@@ -197,9 +197,9 @@ write-up. This closes out `docs/challenge.md`.
       (`implementation-notes.md` §5), signature verified against the signing
       secret, handles `checkout.session.completed` and
       `payment_intent.succeeded`; this is the only `pending → paid` transition
-- [ ] Stock decremented and the stock-notification threshold checked on the
+- [x] Stock decremented and the stock-notification threshold checked on the
       same successful-payment path
-- [ ] Unit tests for the services
+- [x] Unit tests for the services
 - [ ] E2E: cart checkout happy path, plus an unsigned/forged webhook request
       rejected
 
@@ -208,9 +208,12 @@ write-up. This closes out `docs/challenge.md`.
   `prisma.order.updateMany({ where: { id, status: pending }, ... })` rather
   than a read-then-write — a replayed event for an already-paid order matches
   zero rows and is silently a no-op, no separate check needed.
-- `WebhooksService` (`src/webhooks/`) only performs the status transition so
-  far; stock decrement/notification-threshold logic is deliberately left for
-  the next checklist item, to keep it in its own commit.
+- `WebhooksService` decrements stock for every purchased line item once (and
+  only once — an idempotent replay with `updateMany` count 0 skips it) the
+  `pending → paid` transition actually happens. Reaching the low-stock
+  threshold is only logged for now — actually enqueuing the notification is
+  deliberately deferred to Phase 6, which owns the BullMQ queue/processor
+  setup end to end.
 - `POST /checkout/payment-intent` converts the caller's active cart into the
   order (freezing `cart_products.unit_price`, flipping the cart to
   `confirmed`) rather than building an invisible one-off cart like the
