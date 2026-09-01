@@ -17,6 +17,7 @@ import { VariantsModule } from './variants/variants.module.js';
 import { LikedProductsModule } from './liked-products/liked-products.module.js';
 import { CartModule } from './cart/cart.module.js';
 import { CheckoutModule } from './checkout/checkout.module.js';
+import { WebhooksModule } from './webhooks/webhooks.module.js';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { CheckoutModule } from './checkout/checkout.module.js';
     LikedProductsModule,
     CartModule,
     CheckoutModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [

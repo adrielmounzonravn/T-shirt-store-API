@@ -193,7 +193,7 @@ write-up. This closes out `docs/challenge.md`.
 
 - [x] Payment Intent creation for cart checkout (challenge §7B), validating
       stock availability before creating the payment
-- [ ] `POST /webhooks/stripe` — specced in `openapi.yaml` first
+- [x] `POST /webhooks/stripe` — specced in `openapi.yaml` first
       (`implementation-notes.md` §5), signature verified against the signing
       secret, handles `checkout.session.completed` and
       `payment_intent.succeeded`; this is the only `pending → paid` transition
@@ -204,6 +204,13 @@ write-up. This closes out `docs/challenge.md`.
       rejected
 
 **Notes:**
+- Idempotency for the `pending → paid` transition is a single guarded
+  `prisma.order.updateMany({ where: { id, status: pending }, ... })` rather
+  than a read-then-write — a replayed event for an already-paid order matches
+  zero rows and is silently a no-op, no separate check needed.
+- `WebhooksService` (`src/webhooks/`) only performs the status transition so
+  far; stock decrement/notification-threshold logic is deliberately left for
+  the next checklist item, to keep it in its own commit.
 - `POST /checkout/payment-intent` converts the caller's active cart into the
   order (freezing `cart_products.unit_price`, flipping the cart to
   `confirmed`) rather than building an invisible one-off cart like the

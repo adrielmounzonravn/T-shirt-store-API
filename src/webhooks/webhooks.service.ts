@@ -1,0 +1,62 @@
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type Stripe from 'stripe';
+import { OrderStatus } from '../generated/prisma/enums.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { STRIPE_CLIENT } from '../stripe/stripe-client.provider.js';
+
+@Injectable()
+export class WebhooksService {
+  private readonly logger = new Logger(WebhooksService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+    @Inject(STRIPE_CLIENT) private readonly stripe: Stripe,
+  ) {}
+
+  async handleStripeEvent(rawBody: Buffer, signature: string): Promise<void> {
+    const webhookSecret = this.configService.getOrThrow<string>(
+      'stripe.webhookSecret',
+    );
+
+    let event: Stripe.Event;
+    try {
+      event = this.stripe.webhooks.constructEvent(
+        rawBody,
+        signature,
+        webhookSecret,
+      );
+    } catch {
+      throw new BadRequestException('Invalid Stripe webhook payload');
+    }
+
+    switch (event.type) {
+      case 'checkout.session.completed':
+        await this.markOrderPaid(event.data.object.metadata?.orderId);
+        break;
+      case 'payment_intent.succeeded':
+        await this.markOrderPaid(event.data.object.metadata?.orderId);
+        break;
+      default:
+        this.logger.log(`Ignoring unhandled Stripe event type: ${event.type}`);
+    }
+  }
+
+  private async markOrderPaid(orderId: string | undefined): Promise<void> {
+    if (!orderId) {
+      this.logger.warn('Stripe event carried no orderId in its metadata');
+      return;
+    }
+
+    await this.prisma.order.updateMany({
+      where: { id: orderId, status: OrderStatus.pending },
+      data: { status: OrderStatus.paid },
+    });
+  }
+}
