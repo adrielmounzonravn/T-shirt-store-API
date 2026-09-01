@@ -169,7 +169,7 @@ write-up. This closes out `docs/challenge.md`.
 - [x] `POST` endpoint to generate a Payment Link for a single product
       (challenge §7A) — order created `pending` before redirecting to Stripe
 - [x] Unit tests for the service
-- [ ] E2E: single-product checkout happy path through the Payment Link flow
+- [x] E2E: single-product checkout happy path through the Payment Link flow
 
 **Notes:**
 - `orders.idempotency_key` was missing from `schema.prisma` (only `db-schema.md`
@@ -184,6 +184,10 @@ write-up. This closes out `docs/challenge.md`.
   `STRIPE_SECRET_KEY` is blank (allowed outside production) — the Stripe SDK
   throws on construction with an empty string, which broke app boot in e2e/dev
   once a Stripe-dependent module became eagerly imported.
+- `test/checkout.e2e-spec.ts`: no real Stripe test-mode account is configured
+  for e2e, so `stripe.prices.create`/`stripe.paymentLinks.create` are stubbed
+  via `vi.spyOn` on `app.get(STRIPE_CLIENT)`. Same pattern should be reused
+  for the Phase 4 Payment Intent/webhook e2e suite.
 
 ## Phase 4 — Checkout: Payment Intents and webhook
 
