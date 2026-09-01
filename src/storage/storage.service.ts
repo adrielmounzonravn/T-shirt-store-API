@@ -20,6 +20,13 @@ export class StorageService {
     private readonly config: ConfigService,
   ) {}
 
+  getPublicUrl(key: string): string {
+    const bucket = this.config.getOrThrow<string>('s3.bucket');
+    const region = this.config.getOrThrow<string>('s3.region');
+
+    return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+  }
+
   buildObjectKey(
     prefix: 'products' | 'variants',
     parentId: string,

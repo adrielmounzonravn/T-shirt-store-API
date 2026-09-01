@@ -49,6 +49,29 @@ export class MailService {
     }
   }
 
+  async sendLowStockNotificationEmail(
+    email: string,
+    productName: string,
+    imageUrl?: string,
+  ): Promise<void> {
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to: email,
+        subject: `${productName} is almost sold out`,
+        text: `A product you liked, ${productName}, is almost sold out. Grab it before it's gone.`,
+        ...(imageUrl && {
+          html: `<p>A product you liked, <strong>${productName}</strong>, is almost sold out. Grab it before it's gone.</p><img src="${imageUrl}" alt="${productName}" />`,
+        }),
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send low-stock notification email to ${email}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
+  }
+
   async sendPasswordChangedEmail(email: string): Promise<void> {
     try {
       await this.transporter.sendMail({

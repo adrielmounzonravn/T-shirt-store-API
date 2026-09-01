@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import type Stripe from 'stripe';
 import { OrderStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { StockNotificationService } from '../stock-notification/stock-notification.service.js';
 import { STRIPE_CLIENT } from '../stripe/stripe-client.provider.js';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class WebhooksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly stockNotificationService: StockNotificationService,
     @Inject(STRIPE_CLIENT) private readonly stripe: Stripe,
   ) {}
 
@@ -89,6 +91,7 @@ export class WebhooksService {
         this.logger.log(
           `Variant ${skuId} reached the low-stock threshold (${lowStockThreshold})`,
         );
+        await this.stockNotificationService.enqueueLowStockNotification(skuId);
       }
     }
   }

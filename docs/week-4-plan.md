@@ -270,19 +270,26 @@ write-up. This closes out `docs/challenge.md`.
 
 ## Phase 6 — Stock notification job
 
-- [ ] BullMQ queue + processor: when a variant's stock reaches the configured
+- [x] BullMQ queue + processor: when a variant's stock reaches the configured
       low-stock threshold, notify by email every user who liked the product
       and hasn't purchased it
-- [ ] Email includes the product's cover image
-- [ ] `attempts` + backoff on the job; failures logged via `@OnWorkerEvent('failed')`,
+- [x] Email includes the product's cover image
+- [x] `attempts` + backoff on the job; failures logged via `@OnWorkerEvent('failed')`,
       never swallowed
-- [ ] Unit tests for the processor/service
+- [x] Unit tests for the processor/service
 - [ ] Manually trigger the job against the real Mailtrap SMTP credentials set
       up in Phase 1.5 and confirm the email (with the product's cover image)
       lands in the Mailtrap Sandbox inbox — this is the 4th and last email
       case in the project
 
 **Notes:**
+
+- `bullmq` v6 treats `ioredis` as an optional peer dependency it `require()`s
+  lazily; it was never added as a project dependency, so `BullModule` failed
+  to connect on every app bootstrap and the failure path spun fast enough to
+  OOM within seconds. Added `ioredis` as a dependency, and added a Redis
+  Testcontainer to `test/e2e/global-setup.ts` (`@testcontainers/redis`)
+  alongside the existing Postgres one, since e2e specs boot a real app.
 
 ## Phase 7 — Cron jobs
 

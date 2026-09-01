@@ -2,6 +2,7 @@ import { ClassSerializerInterceptor, Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { BullModule } from '@nestjs/bullmq';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
@@ -37,6 +38,16 @@ import { OrdersModule } from './orders/orders.module.js';
           limit: configService.getOrThrow<number>('throttle.limit'),
         },
       ],
+    }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.getOrThrow<string>('redis.host'),
+          port: configService.getOrThrow<number>('redis.port'),
+        },
+      }),
     }),
     PrismaModule,
     HealthModule,

@@ -6,6 +6,7 @@ import { WebhooksService } from './webhooks.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { STRIPE_CLIENT } from '../stripe/stripe-client.provider.js';
 import { OrderStatus } from '../generated/prisma/enums.js';
+import { StockNotificationService } from '../stock-notification/stock-notification.service.js';
 
 describe('WebhooksService', () => {
   let service: WebhooksService;
@@ -26,6 +27,9 @@ describe('WebhooksService', () => {
   let stripe: {
     webhooks: { constructEvent: ReturnType<typeof vi.fn> };
   };
+  let stockNotificationService: {
+    enqueueLowStockNotification: ReturnType<typeof vi.fn>;
+  };
 
   const orderId = 'order-1';
   const webhookSecret = 'whsec_test_123';
@@ -38,6 +42,7 @@ describe('WebhooksService', () => {
         WebhooksService,
         PrismaService,
         ConfigService,
+        StockNotificationService,
         { provide: STRIPE_CLIENT, useValue: stripe },
       ],
     })
@@ -45,6 +50,8 @@ describe('WebhooksService', () => {
       .useValue(prisma)
       .overrideProvider(ConfigService)
       .useValue(configService)
+      .overrideProvider(StockNotificationService)
+      .useValue(stockNotificationService)
       .compile();
 
     return moduleRef.get(WebhooksService);
@@ -105,6 +112,10 @@ describe('WebhooksService', () => {
       webhooks: {
         constructEvent: vi.fn().mockReturnValue(makeCheckoutSessionEvent()),
       },
+    };
+
+    stockNotificationService = {
+      enqueueLowStockNotification: vi.fn().mockResolvedValue(undefined),
     };
 
     service = await setupService();
@@ -350,6 +361,38 @@ describe('WebhooksService', () => {
       await expect(
         service.handleStripeEvent(rawBody, signature),
       ).resolves.toBeUndefined();
+    });
+
+    it('enqueues a low-stock notification when a decremented variant lands exactly on the configured threshold', async () => {
+      stripe.webhooks.constructEvent.mockReturnValue(
+        makeCheckoutSessionEvent(),
+      );
+      prisma.cartProduct.findMany.mockResolvedValue([
+        { skuId: 'sku-1', quantity: 7 },
+      ]);
+      prisma.productVariant.update.mockResolvedValue({ stock: 3 });
+
+      await service.handleStripeEvent(rawBody, signature);
+
+      expect(
+        stockNotificationService.enqueueLowStockNotification,
+      ).toHaveBeenCalledWith('sku-1');
+    });
+
+    it('does not enqueue a low-stock notification when the resulting stock is above the threshold', async () => {
+      stripe.webhooks.constructEvent.mockReturnValue(
+        makeCheckoutSessionEvent(),
+      );
+      prisma.cartProduct.findMany.mockResolvedValue([
+        { skuId: 'sku-1', quantity: 1 },
+      ]);
+      prisma.productVariant.update.mockResolvedValue({ stock: 10 });
+
+      await service.handleStripeEvent(rawBody, signature);
+
+      expect(
+        stockNotificationService.enqueueLowStockNotification,
+      ).not.toHaveBeenCalled();
     });
 
     it('does not look up the order, fetch line items, or decrement stock on an idempotent replay', async () => {
