@@ -244,7 +244,7 @@ write-up. This closes out `docs/challenge.md`.
 - [x] Manager: advance status `paid → processing → shipped`
 - [x] Client: cancel before `shipped`
 - [x] Unit tests for the service
-- [ ] E2E: order history filters/pagination, status advance, cancel-before-
+- [x] E2E: order history filters/pagination, status advance, cancel-before-
       shipped rejection after `shipped`
 
 **Notes:**
@@ -261,6 +261,12 @@ write-up. This closes out `docs/challenge.md`.
   manager-only `/status` endpoint too. Ownership (`cart.userId === user.sub`)
   and the shipped/cancelled 422 check are enforced in `OrdersService.cancel`,
   same pattern as `findOne`'s ownership check.
+- `test/orders.e2e-spec.ts`: found while writing it — `orders.controller.ts`
+  was the only controller with no `ParseUUIDPipe` on its id param, so a
+  non-UUID `orderId` fell through to Prisma and came back as an unhandled
+  500. Fixed alongside the tests (`ParseUUIDPipe` added to all three
+  `:orderId` routes) rather than left as a note, since it's a one-line
+  change consistent with every sibling controller.
 
 ## Phase 6 — Stock notification job
 

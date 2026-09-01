@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Query,
   UseGuards,
@@ -73,7 +74,7 @@ export class OrdersController {
   })
   @ApiErrorResponses(401, 403, 404)
   findOne(
-    @Param('orderId') orderId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
     @CurrentUser() user: JwtPayload,
   ): Promise<OrderDetailEntity> {
     return this.ordersService.findOne(orderId, user);
@@ -95,7 +96,7 @@ export class OrdersController {
   })
   @ApiErrorResponses(401, 403, 404, 422)
   advanceStatus(
-    @Param('orderId') orderId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
     @Body() dto: AdvanceOrderStatusDto,
   ): Promise<OrderEntity> {
     return this.ordersService.advanceStatus(orderId, dto.status);
@@ -115,7 +116,7 @@ export class OrdersController {
   })
   @ApiErrorResponses(401, 403, 404, 422)
   cancel(
-    @Param('orderId') orderId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
     @CurrentUser() user: JwtPayload,
   ): Promise<OrderEntity> {
     return this.ordersService.cancel(orderId, user);
