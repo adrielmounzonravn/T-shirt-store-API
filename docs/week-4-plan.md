@@ -168,7 +168,7 @@ write-up. This closes out `docs/challenge.md`.
 
 - [x] `POST` endpoint to generate a Payment Link for a single product
       (challenge §7A) — order created `pending` before redirecting to Stripe
-- [ ] Unit tests for the service
+- [x] Unit tests for the service
 - [ ] E2E: single-product checkout happy path through the Payment Link flow
 
 **Notes:**
