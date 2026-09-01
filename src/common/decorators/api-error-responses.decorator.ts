@@ -6,6 +6,7 @@ import {
   ApiNotFoundResponse,
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
+  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { ErrorResponseEntity } from '../entities/error-response.entity.js';
 
@@ -34,6 +35,11 @@ const RESPONSE_DECORATORS = {
   409: () =>
     ApiConflictResponse({
       description: 'Conflicting state (e.g. duplicate email)',
+      type: ErrorResponseEntity,
+    }),
+  422: () =>
+    ApiUnprocessableEntityResponse({
+      description: 'Request is well-formed but cannot be processed',
       type: ErrorResponseEntity,
     }),
   429: () =>

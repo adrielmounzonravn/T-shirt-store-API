@@ -21,6 +21,7 @@ import { CheckPolicies } from '../casl/decorators/check-policies.decorator.js';
 import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator.js';
 import { CheckoutService } from './checkout.service.js';
 import { CreatePaymentLinkDto } from './dto/create-payment-link.dto.js';
+import { PaymentIntentEntity } from './entities/payment-intent.entity.js';
 import { PaymentLinkEntity } from './entities/payment-link.entity.js';
 
 @ApiTags('Checkout')
@@ -63,5 +64,38 @@ export class CheckoutController {
     }
 
     return this.checkoutService.createPaymentLink(userId, idempotencyKey, dto);
+  }
+
+  @Post('payment-intent')
+  @UseGuards(PoliciesGuard)
+  @CheckPolicies((ability) => ability.can('create', 'Order'))
+  @ApiOperation({
+    summary:
+      'Create a Stripe Payment Intent to checkout the active cart (Client)',
+    description:
+      'Validates stock availability for every line of the active cart, ' +
+      'calculates the total, and confirms the cart as an order in ' +
+      'status=pending with the associated Payment Intent.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Payment intent created',
+    type: PaymentIntentEntity,
+  })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiErrorResponses(401, 403, 409, 422)
+  createPaymentIntent(
+    @CurrentUser('sub') userId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ): Promise<PaymentIntentEntity> {
+    if (!idempotencyKey || !isUUID(idempotencyKey)) {
+      throw new BadRequestException('Idempotency-Key header must be a UUID');
+    }
+
+    return this.checkoutService.createPaymentIntent(userId, idempotencyKey);
   }
 }

@@ -191,7 +191,7 @@ write-up. This closes out `docs/challenge.md`.
 
 ## Phase 4 — Checkout: Payment Intents and webhook
 
-- [ ] Payment Intent creation for cart checkout (challenge §7B), validating
+- [x] Payment Intent creation for cart checkout (challenge §7B), validating
       stock availability before creating the payment
 - [ ] `POST /webhooks/stripe` — specced in `openapi.yaml` first
       (`implementation-notes.md` §5), signature verified against the signing
@@ -204,6 +204,16 @@ write-up. This closes out `docs/challenge.md`.
       rejected
 
 **Notes:**
+- `POST /checkout/payment-intent` converts the caller's active cart into the
+  order (freezing `cart_products.unit_price`, flipping the cart to
+  `confirmed`) rather than building an invisible one-off cart like the
+  Payment Link flow. `clientSecret` is never persisted (per `openapi.yaml`);
+  an idempotency replay re-fetches it via `stripe.paymentIntents.retrieve`
+  using the stored `orders.payment_intent` id.
+- Unlike Payment Link's `findSellableVariant` (404 on a bad SKU), an
+  unsellable/insufficient-stock line in the cart-checkout flow throws
+  `ConflictException` (409) for every case — `openapi.yaml`'s
+  `/checkout/payment-intent` only documents 401/403/409/422, no 404.
 
 ## Phase 5 — Orders
 
