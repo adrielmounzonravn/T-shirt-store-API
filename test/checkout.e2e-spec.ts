@@ -46,6 +46,56 @@ describe('Checkout (e2e)', () => {
     } as unknown as Stripe.Response<Stripe.PaymentLink>);
   }
 
+  function mockStripePaymentIntentSuccess(clientSecret = 'pi_test_secret_123') {
+    const create = vi.spyOn(stripe.paymentIntents, 'create').mockResolvedValue({
+      id: 'pi_test123',
+      client_secret: clientSecret,
+    } as unknown as Stripe.Response<Stripe.PaymentIntent>);
+    const retrieve = vi
+      .spyOn(stripe.paymentIntents, 'retrieve')
+      .mockResolvedValue({
+        id: 'pi_test123',
+        client_secret: clientSecret,
+      } as unknown as Stripe.Response<Stripe.PaymentIntent>);
+
+    return { create, retrieve };
+  }
+
+  async function addCartItem(
+    token: string,
+    skuId: string,
+    quantity: number,
+  ): Promise<void> {
+    await request(server())
+      .post('/me/cart/items')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ skuId, quantity })
+      .expect(201);
+  }
+
+  function buildWebhookPayload(orderId: string, type: string): string {
+    return JSON.stringify({
+      id: 'evt_test_1',
+      type,
+      data: { object: { id: 'pi_test123', metadata: { orderId } } },
+    });
+  }
+
+  function signWebhookPayload(
+    payload: string,
+    secret = process.env.STRIPE_WEBHOOK_SECRET ?? '',
+  ): string {
+    return stripe.webhooks.generateTestHeaderString({ payload, secret });
+  }
+
+  function deliverWebhook(payload: string, signature: string): request.Test {
+    return request(server())
+      .post('/webhooks/stripe')
+      .set('Content-Type', 'application/json')
+      .set('stripe-signature', signature)
+      .send(payload);
+  }
+
   async function createSellableVariant(
     overrides: {
       stock?: number;
@@ -347,6 +397,167 @@ describe('Checkout (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .set('Idempotency-Key', randomUUID())
         .send({ skuId, quantity: 1, discountCode: 'SUMMER10' })
+        .expect(400);
+    });
+  });
+
+  describe('POST /checkout/payment-intent', () => {
+    it('creates a pending order from the active cart, then marks it paid via the Stripe webhook', async () => {
+      mockStripePaymentIntentSuccess();
+      const { token, userId } = await authClient();
+      const { skuId } = await createSellableVariant({ stock: 5, price: 30 });
+      await addCartItem(token, skuId, 2);
+      const idempotencyKey = randomUUID();
+
+      const response = await request(server())
+        .post('/checkout/payment-intent')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .expect(201);
+
+      const body = response.body as {
+        order: {
+          orderId: string;
+          cartNumber: string;
+          userId: string;
+          status: string;
+          paymentMethod: string;
+          totalAmount: number;
+        };
+        clientSecret: string;
+      };
+
+      expect(body.order.status).toBe('pending');
+      expect(body.order.paymentMethod).toBe('payment_intent');
+      expect(body.order.userId).toBe(userId);
+      expect(body.order.totalAmount).toBe(60);
+      expect(body.clientSecret).toBe('pi_test_secret_123');
+
+      const pendingOrder = await testApp.prisma.order.findUniqueOrThrow({
+        where: { id: body.order.orderId },
+      });
+      expect(pendingOrder.status).toBe('pending');
+      expect(pendingOrder.idempotencyKey).toBe(idempotencyKey);
+      expect(pendingOrder.paymentIntent).toBe('pi_test123');
+
+      const payload = buildWebhookPayload(
+        body.order.orderId,
+        'payment_intent.succeeded',
+      );
+      await deliverWebhook(payload, signWebhookPayload(payload)).expect(200);
+
+      const paidOrder = await testApp.prisma.order.findUniqueOrThrow({
+        where: { id: body.order.orderId },
+      });
+      expect(paidOrder.status).toBe('paid');
+
+      const variant = await testApp.prisma.productVariant.findUniqueOrThrow({
+        where: { id: skuId },
+      });
+      expect(variant.stock).toBe(3);
+    });
+
+    it('returns the same order on a retried Idempotency-Key instead of creating a second one', async () => {
+      const { create } = mockStripePaymentIntentSuccess();
+      const { token } = await authClient();
+      const { skuId } = await createSellableVariant({ stock: 5 });
+      await addCartItem(token, skuId, 1);
+      const idempotencyKey = randomUUID();
+
+      const firstResponse = await request(server())
+        .post('/checkout/payment-intent')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .expect(201);
+
+      const secondResponse = await request(server())
+        .post('/checkout/payment-intent')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .expect(201);
+
+      const firstOrder = (firstResponse.body as { order: { orderId: string } })
+        .order;
+      const secondOrder = (
+        secondResponse.body as { order: { orderId: string } }
+      ).order;
+      expect(secondOrder.orderId).toBe(firstOrder.orderId);
+
+      const orders = await testApp.prisma.order.findMany({
+        where: { idempotencyKey },
+      });
+      expect(orders).toHaveLength(1);
+      expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 422 when the active cart is empty', async () => {
+      mockStripePaymentIntentSuccess();
+      const { token } = await authClient();
+
+      await request(server())
+        .post('/checkout/payment-intent')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', randomUUID())
+        .expect(422);
+    });
+
+    it('returns 409 when a cart item now exceeds current stock', async () => {
+      mockStripePaymentIntentSuccess();
+      const { token } = await authClient();
+      const { skuId } = await createSellableVariant({ stock: 5 });
+      await addCartItem(token, skuId, 3);
+
+      await testApp.prisma.productVariant.update({
+        where: { id: skuId },
+        data: { stock: 1 },
+      });
+
+      await request(server())
+        .post('/checkout/payment-intent')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', randomUUID())
+        .expect(409);
+    });
+
+    it('returns 401 without an Authorization header', async () => {
+      mockStripePaymentIntentSuccess();
+
+      await request(server())
+        .post('/checkout/payment-intent')
+        .set('Idempotency-Key', randomUUID())
+        .expect(401);
+    });
+
+    it('returns 403 for a manager (not a client)', async () => {
+      mockStripePaymentIntentSuccess();
+      const manager = await seedUser(testApp.prisma, { role: Role.manager });
+      const token = signAccessToken(testApp.app, manager);
+
+      await request(server())
+        .post('/checkout/payment-intent')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', randomUUID())
+        .expect(403);
+    });
+
+    it('returns 400 when Idempotency-Key header is missing', async () => {
+      mockStripePaymentIntentSuccess();
+      const { token } = await authClient();
+
+      await request(server())
+        .post('/checkout/payment-intent')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(400);
+    });
+
+    it('returns 400 when Idempotency-Key header is not a UUID', async () => {
+      mockStripePaymentIntentSuccess();
+      const { token } = await authClient();
+
+      await request(server())
+        .post('/checkout/payment-intent')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', 'not-a-uuid')
         .expect(400);
     });
   });

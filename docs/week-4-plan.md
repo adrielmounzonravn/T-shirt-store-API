@@ -200,7 +200,7 @@ write-up. This closes out `docs/challenge.md`.
 - [x] Stock decremented and the stock-notification threshold checked on the
       same successful-payment path
 - [x] Unit tests for the services
-- [ ] E2E: cart checkout happy path, plus an unsigned/forged webhook request
+- [x] E2E: cart checkout happy path, plus an unsigned/forged webhook request
       rejected
 
 **Notes:**
@@ -224,6 +224,16 @@ write-up. This closes out `docs/challenge.md`.
   unsellable/insufficient-stock line in the cart-checkout flow throws
   `ConflictException` (409) for every case — `openapi.yaml`'s
   `/checkout/payment-intent` only documents 401/403/409/422, no 404.
+- `test/checkout.e2e-spec.ts` gained a `POST /checkout/payment-intent` suite;
+  `test/webhooks.e2e-spec.ts` (new) covers the webhook signature checks and
+  idempotency. Signed webhook requests in tests use the real
+  `stripe.webhooks.generateTestHeaderString` against `.env.test`'s (empty)
+  `STRIPE_WEBHOOK_SECRET` — HMAC verification is symmetric, so this exercises
+  real signature checking without a live Stripe secret.
+- Found while writing these tests: `POST /me/cart/items` actually responds
+  `201`, but its Swagger annotation and `openapi.yaml` both document `200`.
+  Left unfixed (test-only task) — worth reconciling in Phase 9's Swagger-vs-
+  spec pass.
 
 ## Phase 5 — Orders
 
