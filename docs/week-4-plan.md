@@ -153,13 +153,16 @@ write-up. This closes out `docs/challenge.md`.
 ## Phase 2 — Liked products and cart
 
 - [x] Like / unlike a product, list liked products
-- [ ] Cart module: add/remove/update items, one active cart per user
+- [x] Cart module: add/remove/update items, one active cart per user
       (`one_active_cart_per_user`), cart expiry rule (`implementation-notes.md`
       §2 — TTL from config, flips `active → expired` before a new cart is
       allowed)
-- [ ] Unit tests for the services
+- [x] Unit tests for the services
 
 **Notes:**
+- Cart/CartNumber tables, CHECK constraints, and the `one_active_cart_per_user`
+  partial index were already present from the initial migration — no new
+  migration needed for this phase.
 
 ## Phase 3 — Checkout: Payment Links
 
