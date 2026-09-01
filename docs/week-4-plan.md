@@ -99,13 +99,18 @@ write-up. This closes out `docs/challenge.md`.
 
 ## Phase 1 — E2E: authentication
 
-- [ ] Written before any other Week-4 code changes, by a subagent that does
+- [x] Written before any other Week-4 code changes, by a subagent that does
       not implement the checkpoint's features
-- [ ] Covers sign up, sign in, email verification, forgot/reset password
+- [x] Covers sign up, sign in, email verification, forgot/reset password
       against a real Postgres (Testcontainers), through the real HTTP pipeline
       (guards, pipes, filters included)
 
 **Notes:**
+- `test/auth.e2e-spec.ts`: since `.env.test` leaves SMTP blank and
+  `MailService` swallows send failures, verification/reset tokens are
+  captured via `vi.spyOn` on the app's real `MailService` instance rather
+  than a fake inbox. Skipped a throttle 429 test — `.env.test`'s
+  `THROTTLE_RESET_PASSWORD_LIMIT=1000` is too high to trip deterministically.
 
 ## Phase 1.5 — Real email delivery (SMTP provider)
 
