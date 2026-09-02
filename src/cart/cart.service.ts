@@ -103,15 +103,13 @@ export class CartService {
     return this.loadCart(cart.cartNumber);
   }
 
+  async expireStaleCarts(): Promise<number> {
+    const { count } = await this.expireCarts();
+    return count;
+  }
+
   private async getOrCreateActiveCart(userId: string): Promise<CartNumber> {
-    await this.prisma.cartNumber.updateMany({
-      where: {
-        userId,
-        status: CartStatus.active,
-        expiresAt: { lt: new Date() },
-      },
-      data: { status: CartStatus.expired },
-    });
+    await this.expireCarts({ userId });
 
     const activeCart = await this.prisma.cartNumber.findFirst({
       where: { userId, status: CartStatus.active },
@@ -128,6 +126,17 @@ export class CartService {
         userId,
         expiresAt: new Date(Date.now() + ttlHours * 60 * 60 * 1000),
       },
+    });
+  }
+
+  private expireCarts(where: { userId?: string } = {}) {
+    return this.prisma.cartNumber.updateMany({
+      where: {
+        ...where,
+        status: CartStatus.active,
+        expiresAt: { lt: new Date() },
+      },
+      data: { status: CartStatus.expired },
     });
   }
 

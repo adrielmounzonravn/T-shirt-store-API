@@ -301,7 +301,7 @@ write-up. This closes out `docs/challenge.md`.
 
 ## Phase 7 — Cron jobs
 
-- [ ] Cart expiry sweep (`@nestjs/schedule`)
+- [x] Cart expiry sweep (`@nestjs/schedule`)
 - [ ] Reset-token cleanup (deletes rows where `used_at IS NULL AND expires_at
       < now()`)
 - [ ] Unit tests for the pure logic each job runs

@@ -4,10 +4,11 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { CaslModule } from '../casl/casl.module.js';
 import { CartController } from './cart.controller.js';
 import { CartService } from './cart.service.js';
+import { CartExpiryCron } from './cart-expiry.cron.js';
 
 @Module({
   imports: [PrismaModule, PassportModule.register({}), CaslModule],
   controllers: [CartController],
-  providers: [CartService],
+  providers: [CartService, CartExpiryCron],
 })
 export class CartModule {}
