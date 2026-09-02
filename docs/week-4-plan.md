@@ -321,7 +321,7 @@ write-up. This closes out `docs/challenge.md`.
 
 ## Phase 9 — Close the block
 
-- [ ] Generated Swagger compared against `openapi.yaml`; differences resolved
+- [x] Generated Swagger compared against `openapi.yaml`; differences resolved
       (the spec wins)
 - [ ] OWASP checklist pass (`implementation-notes.md` §13)
 - [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`,
@@ -329,3 +329,14 @@ write-up. This closes out `docs/challenge.md`.
 - [ ] `CLAUDE.md` scope paragraph updated to match what exists
 - [x] `docs/next-phase.md` deleted once every item on it is resolved (done in
       Phase 0 — the e2e setup exclusions were its only remaining item)
+
+**Notes:**
+- Swagger-vs-spec pass found one remaining gap after the earlier commits
+  (cart-items status code, signin schema, webhook annotations/tag, optional-
+  auth on `GET /products*`, integer types): `PATCH /orders/{orderId}/status`
+  and `PATCH /orders/{orderId}/cancel` document 401/403/422 but not 404 in
+  `openapi.yaml`, even though `OrdersService.advanceStatus`/`cancel` both
+  throw `NotFoundException` for an unknown `orderId` (same as `findOne`,
+  which already documents 404) and the controller's `@ApiErrorResponses`
+  already includes it. Since the 404 behavior is real and intentional, the
+  spec was updated to add it rather than removing it from the code.
