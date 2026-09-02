@@ -17,6 +17,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiResponse,
+  ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
@@ -41,6 +42,8 @@ export class ProductsController {
 
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth('bearerAuth')
+  @ApiSecurity({})
   @ApiOperation({
     summary: 'List products (pagination + category filters)',
     description:
@@ -61,6 +64,8 @@ export class ProductsController {
 
   @Get(':productId')
   @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth('bearerAuth')
+  @ApiSecurity({})
   @ApiOperation({
     summary: 'Get product detail (with variants and images)',
     description: 'Visible to both logged-in and non-logged-in users.',
