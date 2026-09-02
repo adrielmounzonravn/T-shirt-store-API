@@ -51,7 +51,7 @@ export class ProductVariantEntity {
   @ApiProperty({ enum: Gender, enumName: 'Gender' })
   gender: Gender;
 
-  @ApiProperty({ minimum: 0 })
+  @ApiProperty({ type: 'integer', minimum: 0 })
   stock: number;
 
   @ApiProperty({

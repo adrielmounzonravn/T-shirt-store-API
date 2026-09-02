@@ -50,7 +50,7 @@ export class OrderItemEntity {
   @ApiProperty({ type: OrderItemVariantEntity })
   variant: OrderItemVariantEntity;
 
-  @ApiProperty()
+  @ApiProperty({ type: 'integer' })
   quantity: number;
 
   @ApiProperty({ format: 'float', description: 'Price frozen at purchase.' })
