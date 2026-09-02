@@ -7,3 +7,9 @@ coverage
 .env
 
 /src/generated/prisma
+
+# Local tooling config, not meant for the public repo (project refs, downloaded skills, session artifacts)
+.mcp.json
+.agents/
+.playwright-mcp/
+skills-lock.json
