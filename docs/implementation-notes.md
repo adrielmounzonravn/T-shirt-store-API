@@ -157,6 +157,21 @@ These were argued and closed. Reopen only with new information.
   the local `.env` gets real credentials; `.env.test` keeps empty
   placeholders since e2e doesn't need actual delivery.
 
+### Deployment (see `docs/deployment-plan.md`)
+
+- **`app.set('trust proxy', true)` in `main.ts`, not a hop count.** Render
+  (the throwaway demo's host) prepends the real client IP as the *first*
+  entry of `X-Forwarded-For` and does not strip a client-supplied value —
+  the opposite convention from Heroku/nginx-style proxies, which append and
+  make the *last* entry trustworthy. A numeric hop count (`trust proxy: 1`)
+  trusts from the right and would let an attacker forge the leftmost entry
+  to bypass the per-IP `ThrottlerGuard` limits (including the stricter
+  `POST /auth/signin` one from `77b3330`). Confirmed via a direct statement
+  from Render's CEO plus a corroborating report, both on Render's public
+  feedback board — no official `docs.render.com` page states this
+  explicitly. Don't "fix" this back to a hop count assuming standard
+  proxy semantics.
+
 ### Course-material decisions (see §13 for the full reasoning)
 
 - **No URI versioning (`/v1`).** The REST course recommends URI versioning as
