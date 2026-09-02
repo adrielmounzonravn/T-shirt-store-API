@@ -52,7 +52,14 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(LocalAuthGuard)
   @ApiOperation({ summary: 'Sign in' })
-  @ApiResponse({ status: 200, description: 'Authenticated' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authenticated',
+    schema: {
+      type: 'object',
+      properties: { accessToken: { type: 'string' } },
+    },
+  })
   @ApiErrorResponses(401)
   @ApiResponse({
     status: 403,
