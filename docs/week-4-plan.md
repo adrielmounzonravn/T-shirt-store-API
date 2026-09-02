@@ -323,7 +323,7 @@ write-up. This closes out `docs/challenge.md`.
 
 - [x] Generated Swagger compared against `openapi.yaml`; differences resolved
       (the spec wins)
-- [ ] OWASP checklist pass (`implementation-notes.md` §13)
+- [x] OWASP checklist pass (`implementation-notes.md` §13)
 - [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`,
       `npm run test:cov` all green
 - [ ] `CLAUDE.md` scope paragraph updated to match what exists
@@ -340,3 +340,6 @@ write-up. This closes out `docs/challenge.md`.
   which already documents 404) and the controller's `@ApiErrorResponses`
   already includes it. Since the 404 behavior is real and intentional, the
   spec was updated to add it rather than removing it from the code.
+- OWASP pass: `POST /auth/signin` had no per-route throttle beyond the global
+  default; fixed by reusing the reset-password throttle constant (renamed
+  `STRICT_AUTH_THROTTLE`) on signin too, per §10.

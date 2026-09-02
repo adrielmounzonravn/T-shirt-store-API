@@ -22,7 +22,7 @@ import { LocalAuthGuard } from './guards/local-auth.guard.js';
 import { UserEntity } from '../users/entities/user.entity.js';
 import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator.js';
 
-const RESET_PASSWORD_THROTTLE = {
+const STRICT_AUTH_THROTTLE = {
   default: {
     limit: Number(process.env.THROTTLE_RESET_PASSWORD_LIMIT),
     ttl: Number(process.env.THROTTLE_RESET_PASSWORD_TTL),
@@ -51,6 +51,7 @@ export class AuthController {
   @Post('signin')
   @HttpCode(HttpStatus.OK)
   @UseGuards(LocalAuthGuard)
+  @Throttle(STRICT_AUTH_THROTTLE)
   @ApiOperation({ summary: 'Sign in' })
   @ApiResponse({
     status: 200,
@@ -86,7 +87,7 @@ export class AuthController {
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.ACCEPTED)
-  @Throttle(RESET_PASSWORD_THROTTLE)
+  @Throttle(STRICT_AUTH_THROTTLE)
   @ApiOperation({
     summary: 'Request password reset',
     description:
@@ -104,7 +105,7 @@ export class AuthController {
 
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
-  @Throttle(RESET_PASSWORD_THROTTLE)
+  @Throttle(STRICT_AUTH_THROTTLE)
   @ApiOperation({
     summary: 'Reset password with token',
     description:
