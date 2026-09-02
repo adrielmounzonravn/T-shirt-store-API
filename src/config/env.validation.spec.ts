@@ -78,6 +78,46 @@ describe('envValidationSchema', () => {
     expect(error).toBeUndefined();
   });
 
+  it('allows REDIS_PASSWORD and REDIS_TLS to be omitted', () => {
+    const { error } = envValidationSchema.validate(validEnv, {
+      abortEarly: false,
+    });
+
+    expect(error).toBeUndefined();
+  });
+
+  it('allows REDIS_PASSWORD to be blank', () => {
+    const { error } = envValidationSchema.validate(
+      { ...validEnv, REDIS_PASSWORD: '' },
+      { abortEarly: false },
+    );
+
+    expect(error).toBeUndefined();
+  });
+
+  it('accepts REDIS_TLS as "true" or "false"', () => {
+    const { error: errorTrue } = envValidationSchema.validate(
+      { ...validEnv, REDIS_TLS: 'true' },
+      { abortEarly: false },
+    );
+    const { error: errorFalse } = envValidationSchema.validate(
+      { ...validEnv, REDIS_TLS: 'false' },
+      { abortEarly: false },
+    );
+
+    expect(errorTrue).toBeUndefined();
+    expect(errorFalse).toBeUndefined();
+  });
+
+  it('fails when REDIS_TLS is not "true" or "false"', () => {
+    const { error } = envValidationSchema.validate(
+      { ...validEnv, REDIS_TLS: 'yes' },
+      { abortEarly: false },
+    );
+
+    expect(error?.message).toContain('REDIS_TLS');
+  });
+
   it('fails when a required domain setting is missing', () => {
     const rest: Record<string, string> = { ...validEnv };
     delete rest.JWT_SECRET;

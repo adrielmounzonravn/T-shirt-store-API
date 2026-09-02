@@ -26,6 +26,7 @@ import { OrdersModule } from './orders/orders.module.js';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      ignoreEnvFile: true,
       load: [configuration],
       validationSchema: envValidationSchema,
       validationOptions: { libraryOptions: { abortEarly: false } },
@@ -47,6 +48,8 @@ import { OrdersModule } from './orders/orders.module.js';
         connection: {
           host: configService.getOrThrow<string>('redis.host'),
           port: configService.getOrThrow<number>('redis.port'),
+          password: configService.get<string>('redis.password'),
+          ...(configService.get<boolean>('redis.tls') ? { tls: {} } : {}),
         },
       }),
     }),

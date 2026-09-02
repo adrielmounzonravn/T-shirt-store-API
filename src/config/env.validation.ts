@@ -27,6 +27,8 @@ export const envValidationSchema = Joi.object({
 
   REDIS_HOST: Joi.string().required(),
   REDIS_PORT: Joi.number().required(),
+  REDIS_PASSWORD: Joi.string().allow('').optional(),
+  REDIS_TLS: Joi.string().valid('true', 'false').optional(),
 
   QUEUE_JOB_ATTEMPTS: Joi.number().required(),
   QUEUE_JOB_BACKOFF_DELAY_MS: Joi.number().required(),
