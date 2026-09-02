@@ -70,6 +70,10 @@ async function bootstrap() {
         'Stripe-based checkout via Payment Links and Payment Intents.',
       )
       .addTag(
+        'Webhooks',
+        'Inbound events from third parties (Stripe). Called by Stripe, not by a user, so these operations carry no bearer auth.',
+      )
+      .addTag(
         'Orders',
         'Order history and status. Role-polymorphic, so it lives at /orders rather than /me/orders.',
       )
