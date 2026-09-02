@@ -277,7 +277,7 @@ write-up. This closes out `docs/challenge.md`.
 - [x] `attempts` + backoff on the job; failures logged via `@OnWorkerEvent('failed')`,
       never swallowed
 - [x] Unit tests for the processor/service
-- [ ] Manually trigger the job against the real Mailtrap SMTP credentials set
+- [x] Manually trigger the job against the real Mailtrap SMTP credentials set
       up in Phase 1.5 and confirm the email (with the product's cover image)
       lands in the Mailtrap Sandbox inbox — this is the 4th and last email
       case in the project
@@ -290,6 +290,14 @@ write-up. This closes out `docs/challenge.md`.
   OOM within seconds. Added `ioredis` as a dependency, and added a Redis
   Testcontainer to `test/e2e/global-setup.ts` (`@testcontainers/redis`)
   alongside the existing Postgres one, since e2e specs boot a real app.
+- Manual trigger: with `docker compose up -d` (postgres + redis) and
+  `npm run start:dev` running against the real `.env`, a throwaway script
+  added a `likedProduct` row for the seeded client user on a product that has
+  a cover image, then pushed a `notify-likers` job straight onto the
+  `stock-notification` BullMQ queue with that product's variant id (bypassing
+  the webhook path, since no real Stripe checkout is configured). The job
+  completed with no `failedReason`, and the email — with the cover image —
+  arrived in the Mailtrap Sandbox inbox. Test data was cleaned up afterward.
 
 ## Phase 7 — Cron jobs
 
