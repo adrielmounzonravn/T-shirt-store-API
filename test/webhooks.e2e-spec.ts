@@ -86,7 +86,7 @@ describe('Webhooks (e2e)', () => {
       .post('/me/cart/items')
       .set('Authorization', `Bearer ${token}`)
       .send({ skuId, quantity })
-      .expect(201);
+      .expect(200);
   }
 
   async function createPendingPaymentIntentOrder(

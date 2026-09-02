@@ -70,7 +70,7 @@ describe('Checkout (e2e)', () => {
       .post('/me/cart/items')
       .set('Authorization', `Bearer ${token}`)
       .send({ skuId, quantity })
-      .expect(201);
+      .expect(200);
   }
 
   function buildWebhookPayload(orderId: string, type: string): string {

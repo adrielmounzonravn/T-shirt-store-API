@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -50,6 +51,7 @@ export class CartController {
   }
 
   @Post('items')
+  @HttpCode(200)
   @UseGuards(PoliciesGuard)
   @CheckPolicies((ability) => ability.can('create', 'Cart'))
   @ApiOperation({
