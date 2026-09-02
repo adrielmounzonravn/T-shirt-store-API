@@ -98,4 +98,11 @@ export class UsersService {
       data: { usedAt: new Date() },
     });
   }
+
+  async deleteExpiredResetTokens(): Promise<number> {
+    const { count } = await this.prisma.userAuth.deleteMany({
+      where: { usedAt: null, expiresAt: { lt: new Date() } },
+    });
+    return count;
+  }
 }
