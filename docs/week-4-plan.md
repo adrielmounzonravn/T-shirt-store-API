@@ -324,9 +324,9 @@ write-up. This closes out `docs/challenge.md`.
 - [x] Generated Swagger compared against `openapi.yaml`; differences resolved
       (the spec wins)
 - [x] OWASP checklist pass (`implementation-notes.md` §13)
-- [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`,
+- [x] `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`,
       `npm run test:cov` all green
-- [ ] `CLAUDE.md` scope paragraph updated to match what exists
+- [x] `CLAUDE.md` scope paragraph updated to match what exists
 - [x] `docs/next-phase.md` deleted once every item on it is resolved (done in
       Phase 0 — the e2e setup exclusions were its only remaining item)
 

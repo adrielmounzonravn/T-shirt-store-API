@@ -4,24 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A NestJS + Prisma + PostgreSQL T-shirt store API (capstone project, see `docs/challenge.md`). `src/` has auth, CASL authorization, products, SKUs/variants, and product/variant image upload (S3) as working domain modules; cart, orders, and payments are not implemented yet.
+A NestJS + Prisma + PostgreSQL T-shirt store API (capstone project, see `docs/challenge.md`). All mandatory scope from `docs/challenge.md` is implemented: auth, CASL authorization, products/SKUs/variants, image upload (S3), liked products, cart, orders (full `pending → paid → processing → shipped` / `cancelled` status flow, history with filters + pagination), Stripe checkout (Payment Links and Payment Intents) and webhook, the stock-notification job (BullMQ), the cart-expiry and reset-token cron jobs, the architecture write-up, and unit + e2e test coverage. Nothing from `docs/challenge.md`'s "Scope — optional features excluded" is in scope.
 
-**Current scope (Week 4 checkpoint): everything remaining from `docs/challenge.md`.** Liked products, cart, orders (status flow `pending → paid → processing → shipped` / `cancelled`, order history with filters + pagination), Stripe checkout (Payment Links and Payment Intents) and the Stripe webhook, the stock-notification background job (BullMQ), cron jobs (cart expiry, reset-token cleanup), the mandatory architecture write-up, and end-to-end tests. Nothing from `docs/challenge.md`'s "Scope — optional features excluded" comes into scope.
+**Current work is post-checkpoint improvements and changes**, not new challenge features — `docs/week-4-plan.md` is closed and stays as the record of that checkpoint, same as `docs/week-3-plan.md`.
 
 **Unit tests are mandatory alongside development, and must be written by a separate subagent — never by the agent that wrote the implementation.** Write `*.spec.ts` tests for each service as you build it, not afterward, but delegate the actual test-writing to a subagent (e.g. via the Agent tool) rather than writing them yourself. The subagent must receive the service's public interface (file path, exported methods, types, expected behavior/spec from `docs/`) but **not** the implementation itself or any notes on how it was built — the point is to get tests free of the implementer's blind spots, able to catch missing cases or bugs the implementer wouldn't think to check.
 
-**E2E tests are in scope this checkpoint**, covering the critical paths the challenge names: authentication, checkout, and order history. The authentication e2e tests must be written before any of this checkpoint's code is changed; the checkout and order-history e2e tests are written as those flows land, not held until the end of the block. Like unit tests, e2e tests must always be written by a separate subagent — never by the agent that wrote the implementation. They run against a real Postgres via Testcontainers, not an in-memory or mocked database.
+**E2E tests cover the critical paths the challenge names**: authentication, checkout, and order history. Any new e2e coverage for post-checkpoint work follows the same rule as unit tests — written by a separate subagent, never by the agent that wrote the implementation — and runs against a real Postgres via Testcontainers, not an in-memory or mocked database.
 
 **Delegate long or extensive tasks to subagents** to keep the main agent's context clean — a saturated context tends to lose track of details from earlier phases of `docs/` or this file. Prefer spawning a subagent for broad exploration, multi-file implementation, or any step that would otherwise consume a large chunk of context, rather than doing it all inline.
 
 ## Working checklist — `docs/week-4-plan.md`
 
-The step-by-step plan for the current checkpoint, and the way sessions hand off context to each other. Read it before starting work to see what's done and what's next, and keep it current. `docs/week-3-plan.md` stays as the record of the prior checkpoint.
-
-- **Tick the step you finished** (`[ ]` → `[x]`) as part of the same task — don't leave it for the user. A step that lands as a single commit ties the tick into that same commit. A step that spans several commits (see **Git commits** below) gets the tick in a follow-up commit once all of them have landed — don't bundle it into one of the intermediate commits.
-- **Add a note only if a future session would be wrong without it**: a deviation from `docs/`, a blocker, a decision taken on the fly. One or two lines under that phase's **Notes**.
-- **Don't** note what the code already shows, restate the docs, or log routine progress. Short and concise beats complete — the file loses its value once it's noise.
-- If the plan itself turns out wrong, edit it (add/remove/reorder steps) rather than working around it.
+The step-by-step plan for the Week 4 checkpoint, closed out with every step ticked. It's kept as the historical record of that checkpoint, same as `docs/week-3-plan.md` — nothing further gets added to it. Post-checkpoint work has no dedicated checklist doc; track it through normal commits instead.
 
 ## Design docs — the source of truth, read in this order
 
