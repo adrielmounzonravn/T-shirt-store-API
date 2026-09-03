@@ -5,6 +5,7 @@ coverage
 
 # Keep environment variables out of version control
 .env
+.env.render
 
 /src/generated/prisma
 
