@@ -22,16 +22,22 @@ describe('PrismaService', () => {
 
   function createService(): PrismaService {
     const configService = {
-      get: vi.fn().mockReturnValue('postgresql://user:pass@localhost:5432/db'),
+      get: vi.fn((key: string) =>
+        key === 'databaseUrl'
+          ? 'postgresql://user:pass@localhost:5432/db'
+          : undefined,
+      ),
     } as unknown as ConfigService;
 
     return new PrismaService(configService);
   }
 
   it('reads the databaseUrl config key when constructed', () => {
-    const get = vi
-      .fn()
-      .mockReturnValue('postgresql://user:pass@localhost:5432/db');
+    const get = vi.fn((key: string) =>
+      key === 'databaseUrl'
+        ? 'postgresql://user:pass@localhost:5432/db'
+        : undefined,
+    );
     const configService = { get } as unknown as ConfigService;
 
     new PrismaService(configService);

@@ -129,6 +129,28 @@ describe('envValidationSchema', () => {
     expect(error?.message).toContain('JWT_SECRET');
   });
 
+  it('allows DATABASE_CA_CERT_PATH to be omitted', () => {
+    const { error } = envValidationSchema.validate(validEnv, {
+      abortEarly: false,
+    });
+
+    expect(error).toBeUndefined();
+  });
+
+  it('allows DATABASE_CA_CERT_PATH to be blank or a path', () => {
+    const { error: errorBlank } = envValidationSchema.validate(
+      { ...validEnv, DATABASE_CA_CERT_PATH: '' },
+      { abortEarly: false },
+    );
+    const { error: errorPath } = envValidationSchema.validate(
+      { ...validEnv, DATABASE_CA_CERT_PATH: './certs/supabase-ca.crt' },
+      { abortEarly: false },
+    );
+
+    expect(errorBlank).toBeUndefined();
+    expect(errorPath).toBeUndefined();
+  });
+
   it('fails when DATABASE_URL is not a postgres connection string', () => {
     const { error } = envValidationSchema.validate(
       { ...validEnv, DATABASE_URL: 'mysql://user:pass@localhost:3306/db' },

@@ -2,6 +2,7 @@ export default () => ({
   nodeEnv: process.env.NODE_ENV,
   port: parseInt(process.env.PORT ?? '3000', 10),
   databaseUrl: process.env.DATABASE_URL,
+  databaseCaCertPath: process.env.DATABASE_CA_CERT_PATH,
 
   cart: {
     ttlHours: parseInt(process.env.CART_TTL_HOURS ?? '', 10),
