@@ -29,12 +29,11 @@ export default () => ({
   },
 
   throttle: {
-    ttl: parseInt(process.env.THROTTLE_TTL ?? '', 10),
+    // env vars are in seconds; @nestjs/throttler expects ttl in milliseconds.
+    ttl: parseInt(process.env.THROTTLE_TTL ?? '', 10) * 1000,
     limit: parseInt(process.env.THROTTLE_LIMIT ?? '', 10),
-    resetPasswordTtl: parseInt(
-      process.env.THROTTLE_RESET_PASSWORD_TTL ?? '',
-      10,
-    ),
+    resetPasswordTtl:
+      parseInt(process.env.THROTTLE_RESET_PASSWORD_TTL ?? '', 10) * 1000,
     resetPasswordLimit: parseInt(
       process.env.THROTTLE_RESET_PASSWORD_LIMIT ?? '',
       10,

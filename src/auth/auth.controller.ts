@@ -25,7 +25,7 @@ import { ApiErrorResponses } from '../common/decorators/api-error-responses.deco
 const STRICT_AUTH_THROTTLE = {
   default: {
     limit: Number(process.env.THROTTLE_RESET_PASSWORD_LIMIT),
-    ttl: Number(process.env.THROTTLE_RESET_PASSWORD_TTL),
+    ttl: Number(process.env.THROTTLE_RESET_PASSWORD_TTL) * 1000,
   },
 };
 
