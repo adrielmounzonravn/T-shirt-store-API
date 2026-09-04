@@ -22,6 +22,7 @@ describe('WebhooksService', () => {
     productVariant: {
       update: ReturnType<typeof vi.fn>;
     };
+    $transaction: ReturnType<typeof vi.fn>;
   };
   let configService: { getOrThrow: ReturnType<typeof vi.fn> };
   let stripe: {
@@ -98,6 +99,10 @@ describe('WebhooksService', () => {
       productVariant: {
         update: vi.fn().mockResolvedValue({ stock: 10 }),
       },
+      $transaction: vi.fn(
+        (callback: (tx: typeof prisma) => unknown): Promise<unknown> =>
+          Promise.resolve(callback(prisma)),
+      ),
     };
 
     configService = {
@@ -387,6 +392,38 @@ describe('WebhooksService', () => {
         { skuId: 'sku-1', quantity: 1 },
       ]);
       prisma.productVariant.update.mockResolvedValue({ stock: 10 });
+
+      await service.handleStripeEvent(rawBody, signature);
+
+      expect(
+        stockNotificationService.enqueueLowStockNotification,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('enqueues a low-stock notification when a decremented variant crosses the threshold without landing exactly on it', async () => {
+      stripe.webhooks.constructEvent.mockReturnValue(
+        makeCheckoutSessionEvent(),
+      );
+      prisma.cartProduct.findMany.mockResolvedValue([
+        { skuId: 'sku-1', quantity: 3 },
+      ]);
+      prisma.productVariant.update.mockResolvedValue({ stock: 2 });
+
+      await service.handleStripeEvent(rawBody, signature);
+
+      expect(
+        stockNotificationService.enqueueLowStockNotification,
+      ).toHaveBeenCalledWith('sku-1');
+    });
+
+    it('does not enqueue a low-stock notification when the stock was already at or below the threshold before this order', async () => {
+      stripe.webhooks.constructEvent.mockReturnValue(
+        makeCheckoutSessionEvent(),
+      );
+      prisma.cartProduct.findMany.mockResolvedValue([
+        { skuId: 'sku-1', quantity: 1 },
+      ]);
+      prisma.productVariant.update.mockResolvedValue({ stock: 1 });
 
       await service.handleStripeEvent(rawBody, signature);
 

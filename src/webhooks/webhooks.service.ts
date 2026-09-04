@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type Stripe from 'stripe';
+import type { Prisma } from '../generated/prisma/client.js';
 import { OrderStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { StockNotificationService } from '../stock-notification/stock-notification.service.js';
@@ -56,43 +57,63 @@ export class WebhooksService {
       return;
     }
 
-    const { count } = await this.prisma.order.updateMany({
-      where: { id: orderId, status: OrderStatus.pending },
-      data: { status: OrderStatus.paid },
+    const lowStockThreshold =
+      this.configService.getOrThrow<number>('lowStockThreshold');
+
+    const skusToNotify = await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.order.updateMany({
+        where: { id: orderId, status: OrderStatus.pending },
+        data: { status: OrderStatus.paid },
+      });
+
+      if (count === 0) {
+        return [];
+      }
+
+      return this.decrementStock(tx, orderId, lowStockThreshold);
     });
 
-    if (count > 0) {
-      await this.decrementStock(orderId);
+    for (const skuId of skusToNotify) {
+      await this.stockNotificationService.enqueueLowStockNotification(skuId);
     }
   }
 
-  private async decrementStock(orderId: string): Promise<void> {
-    const order = await this.prisma.order.findUniqueOrThrow({
+  private async decrementStock(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    lowStockThreshold: number,
+  ): Promise<string[]> {
+    const order = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
       select: { cartNumber: true },
     });
 
-    const cartProducts = await this.prisma.cartProduct.findMany({
+    const cartProducts = await tx.cartProduct.findMany({
       where: { cartNumber: order.cartNumber },
       select: { skuId: true, quantity: true },
     });
 
-    const lowStockThreshold =
-      this.configService.getOrThrow<number>('lowStockThreshold');
+    const skusToNotify: string[] = [];
 
     for (const { skuId, quantity } of cartProducts) {
-      const variant = await this.prisma.productVariant.update({
+      const variant = await tx.productVariant.update({
         where: { id: skuId },
         data: { stock: { decrement: quantity } },
         select: { stock: true },
       });
 
-      if (variant.stock === lowStockThreshold) {
+      const stockBeforeDecrement = variant.stock + quantity;
+      if (
+        stockBeforeDecrement > lowStockThreshold &&
+        variant.stock <= lowStockThreshold
+      ) {
         this.logger.log(
-          `Variant ${skuId} reached the low-stock threshold (${lowStockThreshold})`,
+          `Variant ${skuId} crossed the low-stock threshold (${lowStockThreshold})`,
         );
-        await this.stockNotificationService.enqueueLowStockNotification(skuId);
+        skusToNotify.push(skuId);
       }
     }
+
+    return skusToNotify;
   }
 }
