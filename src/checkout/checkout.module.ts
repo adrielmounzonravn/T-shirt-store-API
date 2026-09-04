@@ -4,6 +4,7 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { CaslModule } from '../casl/casl.module.js';
 import { StripeModule } from '../stripe/stripe.module.js';
 import { CheckoutController } from './checkout.controller.js';
+import { CheckoutRedirectController } from './checkout-redirect.controller.js';
 import { CheckoutService } from './checkout.service.js';
 
 @Module({
@@ -13,7 +14,7 @@ import { CheckoutService } from './checkout.service.js';
     CaslModule,
     StripeModule,
   ],
-  controllers: [CheckoutController],
+  controllers: [CheckoutController, CheckoutRedirectController],
   providers: [CheckoutService],
 })
 export class CheckoutModule {}
