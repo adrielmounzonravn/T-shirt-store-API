@@ -253,8 +253,12 @@ export class OrdersService {
       throw new ForbiddenException('You do not have access to this order');
     }
     if (!CANCELLABLE_STATUSES.includes(order.status)) {
+      const reason =
+        order.status === OrderStatus.cancelled
+          ? 'already cancelled'
+          : 'already shipped';
       throw new UnprocessableEntityException(
-        'The order has already been shipped and cannot be cancelled',
+        `The order is ${reason} and cannot be cancelled`,
       );
     }
 
