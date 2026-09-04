@@ -54,7 +54,7 @@ Two small, mechanical config changes needed before this app can sit behind Rende
 
 **Open risk carried into Step 4/5**: this only proves the *migration* path works around the IPv6 issue. The running app on Render still needs a normal TCP `DATABASE_URL` connection at runtime — if Render's outbound networking also lacks IPv6 (unconfirmed), the direct-connection string will fail there too, and Step 5 will need the **Session pooler** connection string instead (`aws-0-<region>.pooler.supabase.com`, which has IPv4). Test this explicitly once the Render service exists, before assuming the direct connection string works for `DATABASE_URL`.
 
-**Risk resolved**: Render's outbound networking also lacked IPv6, so `DATABASE_URL` on the deployment uses the Supabase **session pooler** connection string, not the direct connection. Step 5's `DATABASE_URL` value below is stale on that point — the deployed value is the pooler host.
+**Resolved**: the deployment's `DATABASE_URL` uses the Supabase **session pooler** connection string (`aws-0-<region>.pooler.supabase.com`), which has IPv4 and works from Render's outbound networking. Step 5's `DATABASE_URL` line below predates this and should be read as the pooler host.
 
 **Also surfaced, not acted on**: Supabase's advisor flags RLS as disabled on all 10 tables (severity "critical" in its own scoring). Not applicable here — this app never uses Supabase's client SDK or `anon`/`authenticated` roles; Prisma connects with the `postgres` role directly over TCP, and authorization is enforced in-app via CASL. Left as-is deliberately.
 
