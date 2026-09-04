@@ -82,6 +82,10 @@ async function bootstrap() {
         'Order history and status. Role-polymorphic, so it lives at /orders rather than /me/orders.',
       )
       .addServer('http://localhost:3000', 'Local')
+      .addServer(
+        'https://t-shirt-store-api.onrender.com',
+        'Production (Render)',
+      )
       .addBearerAuth(
         { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
         'bearerAuth',

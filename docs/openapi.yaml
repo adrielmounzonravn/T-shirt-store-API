@@ -22,6 +22,8 @@ info:
 servers:
   - url: http://localhost:3000
     description: Local
+  - url: https://t-shirt-store-api.onrender.com
+    description: Production (Render)
 
 tags:
   - name: Auth

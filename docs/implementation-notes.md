@@ -108,6 +108,9 @@ vars (challenge: "schema validation for environment variables" — see §9 for t
 | CORS allowed origins | explicit list | `app.enableCors` (§10) |
 | Rate limit: global / reset-password | e.g. 60s·20 / 60s·5 | `ThrottlerModule` + `@Throttle` (§10) |
 | Redis host/port | — | BullMQ (§11) |
+| Redis password | optional | BullMQ (§11); required by managed Redis providers |
+| Redis TLS (`REDIS_TLS`) | `"true"`/`"false"`, optional | BullMQ (§11); required in production against a managed Redis that enforces TLS |
+| Database CA cert path (`DATABASE_CA_CERT_PATH`) | optional | Postgres connection; set when the provider requires strict TLS with a custom CA |
 | S3 bucket + region + key layout | `products/{product_id}/{image_id}.{ext}`, `variants/{sku_id}/{image_id}.{ext}` | image upload |
 
 Also mandatory per the challenge: helmet, CORS, and a rate limit specifically on
