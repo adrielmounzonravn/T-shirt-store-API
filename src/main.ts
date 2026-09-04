@@ -24,9 +24,9 @@ async function bootstrap() {
     }),
   );
 
+  const allowedOrigins = configService.get<string[]>('cors.allowedOrigins');
   app.enableCors({
-    origin: configService.get<string[]>('cors.allowedOrigins'),
-    credentials: true,
+    origin: allowedOrigins?.includes('*') ? true : allowedOrigins,
   });
 
   app.enableShutdownHooks();
