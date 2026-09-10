@@ -119,6 +119,47 @@ describe('CaslAbilityFactory', () => {
     });
   });
 
+  describe('deliveryPerson', () => {
+    it('has no abilities at all yet', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-4',
+        role: Role.deliveryPerson,
+      });
+
+      expect(ability.cannot('read', 'Product')).toBe(true);
+      expect(ability.cannot('create', 'Product')).toBe(true);
+      expect(ability.cannot('update', 'Product')).toBe(true);
+      expect(ability.cannot('delete', 'Product')).toBe(true);
+      expect(ability.cannot('manage', 'Product')).toBe(true);
+
+      expect(ability.cannot('read', 'Order')).toBe(true);
+      expect(ability.cannot('create', 'Order')).toBe(true);
+      expect(ability.cannot('update', 'Order')).toBe(true);
+      expect(ability.cannot('delete', 'Order')).toBe(true);
+      expect(ability.cannot('cancel', 'Order')).toBe(true);
+      expect(ability.cannot('manage', 'Order')).toBe(true);
+
+      expect(ability.cannot('read', 'Cart')).toBe(true);
+      expect(ability.cannot('manage', 'Cart')).toBe(true);
+
+      expect(ability.rules).toHaveLength(0);
+    });
+  });
+
+  it("gives an unrecognized role no abilities at all, not another role's abilities", () => {
+    const factory = new CaslAbilityFactory();
+    const ability = factory.createForUser({
+      id: 'user-x',
+      role: 'unknownRole' as Role,
+    });
+
+    expect(ability.cannot('read', 'Product')).toBe(true);
+    expect(ability.cannot('read', 'Order')).toBe(true);
+    expect(ability.cannot('manage', 'all')).toBe(true);
+    expect(ability.rules).toHaveLength(0);
+  });
+
   it('returns independent ability instances that do not leak permissions between users', () => {
     const factory = new CaslAbilityFactory();
 

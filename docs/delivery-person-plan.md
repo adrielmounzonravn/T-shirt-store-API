@@ -125,7 +125,7 @@ must update those fixtures/expectations, or Phase 6 will need to.
 
 ## Phase 1 — Authorization (CASL + guards)
 
-- [ ] Restructure `createForUser` into explicit per-role branches so the
+- [x] Restructure `createForUser` into explicit per-role branches so the
       fallback is no longer "client" — a role with no branch must get no
       abilities. Unit tests: `src/casl/casl-ability.factory.spec.ts` (add a
       `deliveryPerson` block and an assertion that an unknown role is empty)
@@ -137,6 +137,9 @@ must update those fixtures/expectations, or Phase 6 will need to.
       endpoint added in Phase 3
 
 **Notes:**
+
+- `deliveryPerson`'s branch in `createForUser` is an empty stub pending the
+  next step (Action `assign` + Order abilities).
 
 ## Phase 2 — Creating delivery-person accounts
 
