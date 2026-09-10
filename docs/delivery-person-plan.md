@@ -132,7 +132,7 @@ must update those fixtures/expectations, or Phase 6 will need to.
 - [x] Add the `assign` action to `Action` and grant it to the Manager for the
       `Order` subject; grant the delivery person `read Order` and `update
       Order` (nothing else — no `Product`, `Cart`, `LikedProduct`)
-- [ ] Confirm `RolesGuard`/`Roles()` need no change for a third role, and that
+- [x] Confirm `RolesGuard`/`Roles()` need no change for a third role, and that
       `src/auth/guard-order.spec.ts`'s chain contract still holds for the new
       endpoint added in Phase 3
 
@@ -140,6 +140,10 @@ must update those fixtures/expectations, or Phase 6 will need to.
 
 - `deliveryPerson`'s branch in `createForUser` now grants `read`/`update`
   `Order` only; no `assign` and no other subject.
+- `RolesGuard` is already role-count-agnostic (`requiredRoles.includes(request.user.role)`
+  over the variadic `@Roles(...)` array), and `guard-order.spec.ts`'s chain
+  assertions (401 → 403 → 200, RolesGuard-vs-PoliciesGuard separation) don't
+  depend on role count either. No code change needed for a third role.
 
 ## Phase 2 — Creating delivery-person accounts
 
