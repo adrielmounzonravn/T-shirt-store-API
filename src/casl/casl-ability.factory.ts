@@ -12,7 +12,7 @@ export type Subjects =
   | 'Order'
   | 'all';
 export type Action =
-  'manage' | 'create' | 'read' | 'update' | 'delete' | 'cancel';
+  'manage' | 'create' | 'read' | 'update' | 'delete' | 'cancel' | 'assign';
 export type AppAbility = Ability<[Action, Subjects]>;
 
 export interface AbilityUser {
@@ -35,6 +35,7 @@ export class CaslAbilityFactory {
         can('manage', 'VariantImage');
         can('read', 'Order');
         can('update', 'Order');
+        can('assign', 'Order');
         break;
       case Role.client:
         can('read', 'Product');
@@ -50,6 +51,8 @@ export class CaslAbilityFactory {
         can('cancel', 'Order');
         break;
       case Role.deliveryPerson:
+        can('read', 'Order');
+        can('update', 'Order');
         break;
       default:
         break;

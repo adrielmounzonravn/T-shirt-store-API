@@ -59,6 +59,16 @@ describe('CaslAbilityFactory', () => {
       expect(ability.can('update', 'VariantImage')).toBe(true);
       expect(ability.can('delete', 'VariantImage')).toBe(true);
     });
+
+    it('can assign an Order', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-1',
+        role: Role.manager,
+      });
+
+      expect(ability.can('assign', 'Order')).toBe(true);
+    });
   });
 
   describe('client', () => {
@@ -117,10 +127,45 @@ describe('CaslAbilityFactory', () => {
       expect(ability.cannot('delete', 'VariantImage')).toBe(true);
       expect(ability.cannot('manage', 'VariantImage')).toBe(true);
     });
+
+    it('cannot assign an Order', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-2',
+        role: Role.client,
+      });
+
+      expect(ability.cannot('assign', 'Order')).toBe(true);
+    });
   });
 
   describe('deliveryPerson', () => {
-    it('has no abilities at all yet', () => {
+    it('can read and update an Order', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-4',
+        role: Role.deliveryPerson,
+      });
+
+      expect(ability.can('read', 'Order')).toBe(true);
+      expect(ability.can('update', 'Order')).toBe(true);
+    });
+
+    it('cannot assign, create, delete, cancel, or manage an Order', () => {
+      const factory = new CaslAbilityFactory();
+      const ability = factory.createForUser({
+        id: 'user-4',
+        role: Role.deliveryPerson,
+      });
+
+      expect(ability.cannot('assign', 'Order')).toBe(true);
+      expect(ability.cannot('create', 'Order')).toBe(true);
+      expect(ability.cannot('delete', 'Order')).toBe(true);
+      expect(ability.cannot('cancel', 'Order')).toBe(true);
+      expect(ability.cannot('manage', 'Order')).toBe(true);
+    });
+
+    it('has no abilities at all on any subject other than Order', () => {
       const factory = new CaslAbilityFactory();
       const ability = factory.createForUser({
         id: 'user-4',
@@ -133,17 +178,35 @@ describe('CaslAbilityFactory', () => {
       expect(ability.cannot('delete', 'Product')).toBe(true);
       expect(ability.cannot('manage', 'Product')).toBe(true);
 
-      expect(ability.cannot('read', 'Order')).toBe(true);
-      expect(ability.cannot('create', 'Order')).toBe(true);
-      expect(ability.cannot('update', 'Order')).toBe(true);
-      expect(ability.cannot('delete', 'Order')).toBe(true);
-      expect(ability.cannot('cancel', 'Order')).toBe(true);
-      expect(ability.cannot('manage', 'Order')).toBe(true);
+      expect(ability.cannot('read', 'ProductVariant')).toBe(true);
+      expect(ability.cannot('create', 'ProductVariant')).toBe(true);
+      expect(ability.cannot('update', 'ProductVariant')).toBe(true);
+      expect(ability.cannot('delete', 'ProductVariant')).toBe(true);
+      expect(ability.cannot('manage', 'ProductVariant')).toBe(true);
+
+      expect(ability.cannot('read', 'ProductImage')).toBe(true);
+      expect(ability.cannot('create', 'ProductImage')).toBe(true);
+      expect(ability.cannot('update', 'ProductImage')).toBe(true);
+      expect(ability.cannot('delete', 'ProductImage')).toBe(true);
+      expect(ability.cannot('manage', 'ProductImage')).toBe(true);
+
+      expect(ability.cannot('read', 'VariantImage')).toBe(true);
+      expect(ability.cannot('create', 'VariantImage')).toBe(true);
+      expect(ability.cannot('update', 'VariantImage')).toBe(true);
+      expect(ability.cannot('delete', 'VariantImage')).toBe(true);
+      expect(ability.cannot('manage', 'VariantImage')).toBe(true);
+
+      expect(ability.cannot('read', 'LikedProduct')).toBe(true);
+      expect(ability.cannot('create', 'LikedProduct')).toBe(true);
+      expect(ability.cannot('update', 'LikedProduct')).toBe(true);
+      expect(ability.cannot('delete', 'LikedProduct')).toBe(true);
+      expect(ability.cannot('manage', 'LikedProduct')).toBe(true);
 
       expect(ability.cannot('read', 'Cart')).toBe(true);
+      expect(ability.cannot('create', 'Cart')).toBe(true);
+      expect(ability.cannot('update', 'Cart')).toBe(true);
+      expect(ability.cannot('delete', 'Cart')).toBe(true);
       expect(ability.cannot('manage', 'Cart')).toBe(true);
-
-      expect(ability.rules).toHaveLength(0);
     });
   });
 

@@ -129,7 +129,7 @@ must update those fixtures/expectations, or Phase 6 will need to.
       fallback is no longer "client" — a role with no branch must get no
       abilities. Unit tests: `src/casl/casl-ability.factory.spec.ts` (add a
       `deliveryPerson` block and an assertion that an unknown role is empty)
-- [ ] Add the `assign` action to `Action` and grant it to the Manager for the
+- [x] Add the `assign` action to `Action` and grant it to the Manager for the
       `Order` subject; grant the delivery person `read Order` and `update
       Order` (nothing else — no `Product`, `Cart`, `LikedProduct`)
 - [ ] Confirm `RolesGuard`/`Roles()` need no change for a third role, and that
@@ -138,8 +138,8 @@ must update those fixtures/expectations, or Phase 6 will need to.
 
 **Notes:**
 
-- `deliveryPerson`'s branch in `createForUser` is an empty stub pending the
-  next step (Action `assign` + Order abilities).
+- `deliveryPerson`'s branch in `createForUser` now grants `read`/`update`
+  `Order` only; no `assign` and no other subject.
 
 ## Phase 2 — Creating delivery-person accounts
 
