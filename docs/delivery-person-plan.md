@@ -144,6 +144,15 @@ must update those fixtures/expectations, or Phase 6 will need to.
   over the variadic `@Roles(...)` array), and `guard-order.spec.ts`'s chain
   assertions (401 → 403 → 200, RolesGuard-vs-PoliciesGuard separation) don't
   depend on role count either. No code change needed for a third role.
+- **Known exposure window until Phase 4**: `PATCH /orders/{orderId}/status`
+  (`orders.controller.ts`) is gated only by `ability.can('update', 'Order')`,
+  with no `RolesGuard`/role check of its own. Since `deliveryPerson` now
+  holds `update Order`, a delivery person can currently call that endpoint
+  and advance any order's status (e.g. `paid → processing → shipped`) with
+  no per-actor restriction in `advanceStatus`. This closes only once Phase 4
+  adds the per-actor rule restricting `deliveryPerson` to `shipped →
+  delivered` on their own assigned order. Do not merge/deploy this branch
+  before Phase 4 lands.
 
 ## Phase 2 — Creating delivery-person accounts
 
