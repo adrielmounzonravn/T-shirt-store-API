@@ -19,6 +19,7 @@ datasource db {
 enum Role {
   manager
   client
+  deliveryPerson
 }
 
 enum Size {
