@@ -131,6 +131,23 @@ describe('Auth (e2e)', () => {
         })
         .expect(400);
     });
+
+    it('returns 400 for a smuggled role field and creates no user', async () => {
+      await request(server())
+        .post('/auth/signup')
+        .send({
+          email: 'role-smuggle@example.com',
+          password: 'Password123!',
+          fullName: 'Role Smuggle',
+          role: 'manager',
+        })
+        .expect(400);
+
+      const dbUser = await testApp.prisma.user.findUnique({
+        where: { email: 'role-smuggle@example.com' },
+      });
+      expect(dbUser).toBeNull();
+    });
   });
 
   describe('POST /auth/signin', () => {

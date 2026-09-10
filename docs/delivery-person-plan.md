@@ -166,11 +166,15 @@ must update those fixtures/expectations, or Phase 6 will need to.
       and a `role` restricted to `deliveryPerson`, returning `UserEntity`. This
       is the first users controller — follow the controller/Swagger conventions
       in `implementation-notes.md` §10 and §13
-- [ ] Confirm `POST /auth/signup` still cannot set a role (`forbidNonWhitelisted`
+- [x] Confirm `POST /auth/signup` still cannot set a role (`forbidNonWhitelisted`
       already 400s an extra field; `test/auth.e2e-spec.ts` asserts the created
       role is `client`)
 
-**Notes:**
+**Notes:** confirmed `SignUpDto` has no `role` field and the global
+`ValidationPipe` (`src/main.ts`) keeps `forbidNonWhitelisted: true`. Added an
+e2e case asserting a smuggled `role` field 400s and creates no user
+(`test/auth.e2e-spec.ts`), since the prior extra-field test only used a
+generic field name.
 
 ## Phase 3 — Assigning an order to a delivery person
 
