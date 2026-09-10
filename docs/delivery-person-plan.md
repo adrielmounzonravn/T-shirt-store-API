@@ -111,7 +111,7 @@ Listed so no later session has to re-discover them.
       constraint that `shipped`/`delivered` orders always carry an assignee
 - [x] `npx prisma generate`, then confirm `npm run build` and `npm test` are
       still green against the regenerated client
-- [ ] Seed a `deliveryPerson` user in `prisma/seed.ts`, mirroring the existing
+- [x] Seed a `deliveryPerson` user in `prisma/seed.ts`, mirroring the existing
       manager/client upserts
 
 **Notes:**
