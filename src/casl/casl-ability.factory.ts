@@ -10,6 +10,7 @@ export type Subjects =
   | 'LikedProduct'
   | 'Cart'
   | 'Order'
+  | 'User'
   | 'all';
 export type Action =
   'manage' | 'create' | 'read' | 'update' | 'delete' | 'cancel' | 'assign';
@@ -36,6 +37,7 @@ export class CaslAbilityFactory {
         can('read', 'Order');
         can('update', 'Order');
         can('assign', 'Order');
+        can('create', 'User');
         break;
       case Role.client:
         can('read', 'Product');

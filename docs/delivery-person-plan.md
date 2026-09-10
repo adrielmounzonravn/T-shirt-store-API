@@ -161,7 +161,7 @@ must update those fixtures/expectations, or Phase 6 will need to.
       `src/users/users.service.spec.ts` — keep the existing "does not forward a
       caller-supplied role" guarantee for the sign-up path while the new,
       explicit path does
-- [ ] Add a Manager-only `POST /users` (`JwtAuthGuard, RolesGuard,
+- [x] Add a Manager-only `POST /users` (`JwtAuthGuard, RolesGuard,
       PoliciesGuard`) with a DTO that accepts `email`, `password`, `fullName`
       and a `role` restricted to `deliveryPerson`, returning `UserEntity`. This
       is the first users controller — follow the controller/Swagger conventions
