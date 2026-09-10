@@ -109,7 +109,7 @@ Listed so no later session has to re-discover them.
       `CREATE INDEX orders_delivery_person_id_idx ON orders(delivery_person_id)
       WHERE delivery_person_id IS NOT NULL` (assignment is sparse), and a CHECK
       constraint that `shipped`/`delivered` orders always carry an assignee
-- [ ] `npx prisma generate`, then confirm `npm run build` and `npm test` are
+- [x] `npx prisma generate`, then confirm `npm run build` and `npm test` are
       still green against the regenerated client
 - [ ] Seed a `deliveryPerson` user in `prisma/seed.ts`, mirroring the existing
       manager/client upserts
