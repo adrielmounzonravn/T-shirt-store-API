@@ -156,7 +156,7 @@ must update those fixtures/expectations, or Phase 6 will need to.
 
 ## Phase 2 — Creating delivery-person accounts
 
-- [ ] Let `UsersService.create` accept an explicit `role` (defaulting to
+- [x] Let `UsersService.create` accept an explicit `role` (defaulting to
       `client` so `AuthService.signUp` is unaffected). Unit tests:
       `src/users/users.service.spec.ts` — keep the existing "does not forward a
       caller-supplied role" guarantee for the sign-up path while the new,
