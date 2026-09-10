@@ -62,6 +62,7 @@ enum OrderStatus {
   paid
   processing
   shipped
+  delivered
   cancelled
 }
 
