@@ -103,7 +103,7 @@ Listed so no later session has to re-discover them.
 - [x] Add nullable `deliveryPersonId` to `model Order` with its relation to
       `User` (named relation — `User` already has `cartNumbers`), and the
       matching back-reference on `User`
-- [ ] Generate the migration with
+- [x] Generate the migration with
       `npx prisma migrate dev --create-only --name add_delivery_person_role`
       and hand-edit it per `implementation-notes.md` §1: a partial FK index
       `CREATE INDEX orders_delivery_person_id_idx ON orders(delivery_person_id)
