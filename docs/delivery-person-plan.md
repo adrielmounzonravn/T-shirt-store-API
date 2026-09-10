@@ -114,7 +114,14 @@ Listed so no later session has to re-discover them.
 - [x] Seed a `deliveryPerson` user in `prisma/seed.ts`, mirroring the existing
       manager/client upserts
 
-**Notes:**
+**Notes:** the `chk_shipped_delivered_has_assignee` CHECK constraint
+(added in this phase) is not yet satisfiable by app logic until Phase 4
+gates `processing → shipped` on having an assignee. Until Phase 4 lands,
+`npm run test:e2e` fails on 3 pre-existing `orders.e2e-spec.ts` cases that
+create a `shipped` order without a `deliveryPersonId` (manager advances
+processing→shipped; 422 on already-shipped for out-of-flow and for cancel).
+This is expected sequencing, not a regression to fix in Phase 0-3 — Phase 4
+must update those fixtures/expectations, or Phase 6 will need to.
 
 ## Phase 1 — Authorization (CASL + guards)
 
