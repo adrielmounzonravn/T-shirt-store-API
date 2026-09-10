@@ -100,7 +100,7 @@ Listed so no later session has to re-discover them.
 
 - [x] Add `deliveryPerson` to `enum Role` in `prisma/schema.prisma`
 - [x] Add `delivered` to `enum OrderStatus` in `prisma/schema.prisma`
-- [ ] Add nullable `deliveryPersonId` to `model Order` with its relation to
+- [x] Add nullable `deliveryPersonId` to `model Order` with its relation to
       `User` (named relation — `User` already has `cartNumbers`), and the
       matching back-reference on `User`
 - [ ] Generate the migration with
