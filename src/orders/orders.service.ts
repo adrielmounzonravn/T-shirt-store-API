@@ -22,6 +22,7 @@ const ALLOWED_STATUS_ADVANCES: Partial<
 > = {
   [OrderStatus.paid]: OrderStatus.processing,
   [OrderStatus.processing]: OrderStatus.shipped,
+  [OrderStatus.shipped]: OrderStatus.delivered,
 };
 
 const CANCELLABLE_STATUSES: OrderStatus[] = [
@@ -226,6 +227,11 @@ export class OrdersService {
     }
     if (ALLOWED_STATUS_ADVANCES[order.status] !== status) {
       throw new UnprocessableEntityException('State transition not allowed');
+    }
+    if (status === OrderStatus.shipped && !order.deliveryPersonId) {
+      throw new UnprocessableEntityException(
+        'Order must have an assigned delivery person before it can be shipped',
+      );
     }
 
     const updated = await this.prisma.order.update({

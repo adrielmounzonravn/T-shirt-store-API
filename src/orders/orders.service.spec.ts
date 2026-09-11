@@ -712,13 +712,15 @@ describe('OrdersService', () => {
       );
     });
 
-    it('allows the processing -> shipped transition and persists the new status', async () => {
+    it('allows the processing -> shipped transition when a delivery person is assigned and persists the new status', async () => {
+      const deliveryPersonId = 'delivery-1';
       const updatedOrder = makeOrder({
         status: OrderStatus.shipped,
+        deliveryPersonId,
         updatedAt: new Date('2024-06-03T00:00:00.000Z'),
       });
       const { service, prisma: advancePrisma } = await setupAdvance(
-        makeOrder({ status: OrderStatus.processing }),
+        makeOrder({ status: OrderStatus.processing, deliveryPersonId }),
         updatedOrder,
       );
 
@@ -730,8 +732,68 @@ describe('OrdersService', () => {
           orderId,
           userId: clientUserId,
           status: OrderStatus.shipped,
+          deliveryPersonId,
         }),
       );
+    });
+
+    it('throws UnprocessableEntityException for processing -> shipped when no delivery person is assigned, and does not call update', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.processing, deliveryPersonId: null }),
+      );
+
+      await expect(
+        service.advanceStatus(orderId, OrderStatus.shipped),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect(advancePrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('allows the shipped -> delivered transition and persists the new status', async () => {
+      const deliveryPersonId = 'delivery-1';
+      const updatedOrder = makeOrder({
+        status: OrderStatus.delivered,
+        deliveryPersonId,
+        updatedAt: new Date('2024-06-04T00:00:00.000Z'),
+      });
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.shipped, deliveryPersonId }),
+        updatedOrder,
+      );
+
+      const result = await service.advanceStatus(
+        orderId,
+        OrderStatus.delivered,
+      );
+
+      expect(advancePrisma.order.update).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(
+        expect.objectContaining({
+          orderId,
+          userId: clientUserId,
+          status: OrderStatus.delivered,
+          deliveryPersonId,
+        }),
+      );
+    });
+
+    it('allows the shipped -> delivered transition even without a delivery person assigned', async () => {
+      const updatedOrder = makeOrder({
+        status: OrderStatus.delivered,
+        deliveryPersonId: null,
+        updatedAt: new Date('2024-06-04T00:00:00.000Z'),
+      });
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.shipped, deliveryPersonId: null }),
+        updatedOrder,
+      );
+
+      const result = await service.advanceStatus(
+        orderId,
+        OrderStatus.delivered,
+      );
+
+      expect(advancePrisma.order.update).toHaveBeenCalledTimes(1);
+      expect(result.status).toBe(OrderStatus.delivered);
     });
 
     it.each([

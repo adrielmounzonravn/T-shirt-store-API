@@ -204,7 +204,7 @@ generic field name.
 
 - [x] Extend `ADVANCEABLE_STATUSES` in `src/orders/dto/advance-order-status.dto.ts`
       with `delivered`
-- [ ] Extend `ALLOWED_STATUS_ADVANCES` with `shipped → delivered`, and gate
+- [x] Extend `ALLOWED_STATUS_ADVANCES` with `shipped → delivered`, and gate
       `processing → shipped` on the order having an assignee (422, consistent
       with the existing out-of-flow error). Unit tests:
       `src/orders/orders.service.spec.ts`
