@@ -185,12 +185,20 @@ generic field name.
 - [x] `PATCH /orders/{orderId}/delivery-person` in `src/orders/orders.controller.ts`,
       gated on `ability.can('assign', 'Order')`, with its DTO
       (`deliveryPersonId`, UUID)
-- [ ] Expose `deliveryPersonId` (and the delivery person's name/email on the
+- [x] Expose `deliveryPersonId` (and the delivery person's name/email on the
       detail read) on the order entities — `order-detail.entity.ts`,
       `order-list.entity.ts`, and the `OrderRow`/raw-SQL projection in
       `orders.service.ts`
 
 **Notes:**
+
+- `deliveryPersonId` lives on the shared `OrderEntity`
+  (`src/checkout/entities/order.entity.ts`), so `order-list.entity.ts` needed
+  no change — it already wraps `OrderEntity[]` and inherits the field.
+  `order-detail.entity.ts` adds the name/email separately, nested under a
+  `deliveryPerson: OrderDeliveryPersonEntity | null` field (null when
+  unassigned), mirroring the existing `OrderItemVariantEntity` nesting
+  pattern rather than flattening two more scalar fields onto the entity.
 
 ## Phase 4 — `shipped → delivered`
 

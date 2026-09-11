@@ -265,6 +265,118 @@ describe('OrdersService', () => {
     });
   });
 
+  describe('deliveryPersonId on findMany rows', () => {
+    it('reflects a null deliveryPersonId when the order has no assignment', async () => {
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([makeOrderRow({ deliveryPersonId: null })])
+        .mockResolvedValueOnce([{ count: 1 }]);
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      const result = await service.findMany(baseQuery(), managerUser);
+
+      expect(result.data[0].deliveryPersonId).toBeNull();
+    });
+
+    it('reflects the assigned deliveryPersonId when the order has an assignment', async () => {
+      const deliveryPersonId = 'delivery-1';
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([makeOrderRow({ deliveryPersonId })])
+        .mockResolvedValueOnce([{ count: 1 }]);
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      const result = await service.findMany(baseQuery(), managerUser);
+
+      expect(result.data[0].deliveryPersonId).toBe(deliveryPersonId);
+    });
+
+    it('keeps distinct deliveryPersonId values across rows on the same page', async () => {
+      const deliveryPersonId = 'delivery-1';
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([
+          makeOrderRow({ id: 'order-1', deliveryPersonId }),
+          makeOrderRow({ id: 'order-2', deliveryPersonId: null }),
+        ])
+        .mockResolvedValueOnce([{ count: 2 }]);
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      const result = await service.findMany(baseQuery(), managerUser);
+
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0].deliveryPersonId).toBe(deliveryPersonId);
+      expect(result.data[1].deliveryPersonId).toBeNull();
+    });
+
+    it('still applies filters correctly alongside the new deliveryPersonId field', async () => {
+      const deliveryPersonId = 'delivery-1';
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([
+          makeOrderRow({ status: OrderStatus.shipped, deliveryPersonId }),
+        ])
+        .mockResolvedValueOnce([{ count: 1 }]);
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      const result = await service.findMany(
+        baseQuery({ status: OrderStatus.shipped }),
+        managerUser,
+      );
+
+      expect(result.data[0].status).toBe(OrderStatus.shipped);
+      expect(result.data[0].deliveryPersonId).toBe(deliveryPersonId);
+    });
+
+    it('does not expose a nested delivery person object on list rows', async () => {
+      const deliveryPersonId = 'delivery-1';
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([makeOrderRow({ deliveryPersonId })])
+        .mockResolvedValueOnce([{ count: 1 }]);
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      const result = await service.findMany(baseQuery(), managerUser);
+
+      expect(result.data[0]).not.toHaveProperty('deliveryPerson');
+    });
+  });
+
   describe('findOne', () => {
     const orderId = 'order-1';
 
@@ -463,6 +575,52 @@ describe('OrdersService', () => {
         findOnePrisma.order.findUnique.mock.calls,
       );
       expect(argsString).toContain(orderId);
+    });
+
+    describe('delivery person assignment', () => {
+      const deliveryPersonId = 'delivery-1';
+
+      it('returns null deliveryPersonId and no fabricated name/email when unassigned', async () => {
+        const { service } = await setupFindUnique(
+          makeOrderWithCart({ deliveryPersonId: null, deliveryPerson: null }),
+        );
+
+        const result = await service.findOne(orderId, managerUser);
+
+        expect(result.deliveryPersonId).toBeNull();
+        expect(JSON.stringify(result)).not.toContain('Dana Delivery');
+        expect(JSON.stringify(result)).not.toContain('dana@example.com');
+      });
+
+      it('does not throw when unassigned', async () => {
+        const { service } = await setupFindUnique(
+          makeOrderWithCart({ deliveryPersonId: null, deliveryPerson: null }),
+        );
+
+        await expect(
+          service.findOne(orderId, managerUser),
+        ).resolves.not.toThrow();
+      });
+
+      it('surfaces the assigned deliveryPersonId and the delivery person name/email when assigned', async () => {
+        const { service } = await setupFindUnique(
+          makeOrderWithCart({
+            deliveryPersonId,
+            deliveryPerson: {
+              id: deliveryPersonId,
+              fullName: 'Dana Delivery',
+              email: 'dana@example.com',
+            },
+          }),
+        );
+
+        const result = await service.findOne(orderId, managerUser);
+
+        expect(result.deliveryPersonId).toBe(deliveryPersonId);
+        const resultString = JSON.stringify(result);
+        expect(resultString).toContain('Dana Delivery');
+        expect(resultString).toContain('dana@example.com');
+      });
     });
   });
 

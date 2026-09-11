@@ -43,6 +43,7 @@ interface OrderRow {
   paymentLink: string | null;
   paymentIntent: string | null;
   totalAmount: number;
+  deliveryPersonId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -99,6 +100,7 @@ export class OrdersService {
              o.status AS "status",
              o.payment_link AS "paymentLink",
              o.payment_intent AS "paymentIntent",
+             o.delivery_person_id AS "deliveryPersonId",
              o.created_at AS "createdAt",
              o.updated_at AS "updatedAt",
              COALESCE(SUM(cp.unit_price * cp.quantity), 0)::float AS "totalAmount"
@@ -136,6 +138,7 @@ export class OrdersService {
           ? PaymentMethod.payment_link
           : PaymentMethod.payment_intent,
         totalAmount: row.totalAmount,
+        deliveryPersonId: row.deliveryPersonId,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
       })),
@@ -154,6 +157,7 @@ export class OrdersService {
             },
           },
         },
+        deliveryPerson: true,
       },
     });
 
@@ -179,6 +183,7 @@ export class OrdersService {
           ? PaymentMethod.payment_link
           : PaymentMethod.payment_intent,
         totalAmount,
+        deliveryPersonId: order.deliveryPersonId,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
       },
@@ -194,6 +199,12 @@ export class OrdersService {
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
       })),
+      order.deliveryPerson
+        ? {
+            fullName: order.deliveryPerson.fullName,
+            email: order.deliveryPerson.email,
+          }
+        : null,
     );
   }
 
@@ -236,6 +247,7 @@ export class OrdersService {
         ? PaymentMethod.payment_link
         : PaymentMethod.payment_intent,
       totalAmount,
+      deliveryPersonId: updated.deliveryPersonId,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     });
@@ -298,6 +310,7 @@ export class OrdersService {
         ? PaymentMethod.payment_link
         : PaymentMethod.payment_intent,
       totalAmount,
+      deliveryPersonId: updated.deliveryPersonId,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     });
@@ -348,6 +361,7 @@ export class OrdersService {
         ? PaymentMethod.payment_link
         : PaymentMethod.payment_intent,
       totalAmount,
+      deliveryPersonId: updated.deliveryPersonId,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     });
