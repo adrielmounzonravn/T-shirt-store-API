@@ -215,6 +215,57 @@ describe('OrdersService', () => {
     });
   });
 
+  describe('deliveryPersonId filter', () => {
+    const deliveryPersonId = 'delivery-99';
+
+    it('scopes to the given deliveryPersonId for a manager with a deliveryPersonId filter', async () => {
+      await service.findMany(baseQuery({ deliveryPersonId }), managerUser);
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(deliveryPersonId);
+    });
+
+    it('does not scope by delivery person for a manager with no deliveryPersonId filter', async () => {
+      await service.findMany(baseQuery(), managerUser);
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).not.toContain(deliveryPersonId);
+    });
+
+    it('ignores query.deliveryPersonId for a client and scopes to the client own id', async () => {
+      await service.findMany(
+        baseQuery({ deliveryPersonId }),
+        clientUser,
+      );
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(clientUserId);
+      expect(argsString).not.toContain(deliveryPersonId);
+    });
+
+    it('ignores query.deliveryPersonId for a delivery person and scopes to their own assigned id', async () => {
+      await service.findMany(
+        baseQuery({ deliveryPersonId: otherDeliveryUser.sub }),
+        deliveryUser,
+      );
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(deliveryUser.sub);
+      expect(argsString).not.toContain(otherDeliveryUser.sub);
+    });
+
+    it('combines userId and deliveryPersonId filters together for a manager', async () => {
+      await service.findMany(
+        baseQuery({ userId: otherUserId, deliveryPersonId }),
+        managerUser,
+      );
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(otherUserId);
+      expect(argsString).toContain(deliveryPersonId);
+    });
+  });
+
   describe('payment method derivation', () => {
     it('derives payment_link when paymentLink is set', async () => {
       prisma.$queryRaw = vi

@@ -231,7 +231,7 @@ was factually wrong. Added an explicit `already delivered` branch.
       user.sub` on `cn.user_id`, L55-56) so every existing filter, price range
       and pagination option keeps working. Unit tests:
       `src/orders/orders.service.spec.ts`
-- [ ] Add a Manager-only `deliveryPersonId` filter to
+- [x] Add a Manager-only `deliveryPersonId` filter to
       `src/orders/dto/list-orders-query.dto.ts`, mirroring how the existing
       manager-only `userId` filter is handled
 - [ ] Extend the ownership check in `findOne` (L158) so a delivery person can

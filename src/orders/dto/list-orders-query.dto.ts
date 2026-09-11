@@ -68,4 +68,13 @@ export class ListOrdersQueryDto {
   @IsOptional()
   @IsUUID()
   userId?: string;
+
+  @ApiPropertyOptional({
+    type: 'string',
+    format: 'uuid',
+    description: 'Manager only — filter by assigned delivery person',
+  })
+  @IsOptional()
+  @IsUUID()
+  deliveryPersonId?: string;
 }

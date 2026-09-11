@@ -69,6 +69,11 @@ export class OrdersService {
     } else if (targetUserId) {
       conditions.push(Prisma.sql`cn.user_id = ${targetUserId}::uuid`);
     }
+    if (isManager && query.deliveryPersonId) {
+      conditions.push(
+        Prisma.sql`o.delivery_person_id = ${query.deliveryPersonId}::uuid`,
+      );
+    }
     if (dateFrom) {
       conditions.push(Prisma.sql`o.created_at >= ${new Date(dateFrom)}`);
     }

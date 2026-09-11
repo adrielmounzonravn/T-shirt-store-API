@@ -39,11 +39,15 @@ export class OrdersController {
   @Get()
   @CheckPolicies((ability) => ability.can('read', 'Order'))
   @ApiOperation({
-    summary: 'List orders (own orders for Client, all orders for Manager)',
+    summary:
+      'List orders (own orders for Client, assigned orders for Delivery ' +
+      'Person, all orders for Manager)',
     description:
-      'Client sees only their own orders — the userId filter is ignored ' +
-      'for them. Manager sees the orders of all clients, and can narrow ' +
-      'to a single client with ?userId=.',
+      'Client sees only their own orders, and Delivery Person sees only ' +
+      'orders assigned to them — the userId and deliveryPersonId filters ' +
+      'are ignored for both. Manager sees the orders of all clients, and ' +
+      'can narrow to a single client with ?userId= or to a single ' +
+      'delivery person with ?deliveryPersonId=.',
   })
   @ApiResponse({
     status: 200,
