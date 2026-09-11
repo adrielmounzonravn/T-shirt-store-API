@@ -30,6 +30,11 @@ const CANCELLABLE_STATUSES: OrderStatus[] = [
   OrderStatus.processing,
 ];
 
+const ASSIGNABLE_STATUSES: OrderStatus[] = [
+  OrderStatus.paid,
+  OrderStatus.processing,
+];
+
 interface OrderRow {
   id: string;
   cartNumber: string;
@@ -215,6 +220,68 @@ export class OrdersService {
     const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { status },
+    });
+
+    const totalAmount = order.cart.cartProducts.reduce(
+      (sum, item) => sum + Number(item.unitPrice) * item.quantity,
+      0,
+    );
+
+    return new OrderEntity({
+      id: updated.id,
+      cartNumber: updated.cartNumber,
+      userId: order.cart.userId,
+      status: updated.status,
+      paymentMethod: updated.paymentLink
+        ? PaymentMethod.payment_link
+        : PaymentMethod.payment_intent,
+      totalAmount,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+    });
+  }
+
+  async assignDeliveryPerson(
+    orderId: string,
+    deliveryPersonId: string,
+  ): Promise<OrderEntity> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        cart: {
+          include: { cartProducts: true },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    if (!ASSIGNABLE_STATUSES.includes(order.status)) {
+      throw new UnprocessableEntityException(
+        'Order must be paid or processing to assign a delivery person',
+      );
+    }
+
+    const deliveryPerson = await this.prisma.user.findUnique({
+      where: { id: deliveryPersonId },
+    });
+
+    if (!deliveryPerson) {
+      throw new NotFoundException('Delivery person not found');
+    }
+    if (
+      !deliveryPerson.isActive ||
+      deliveryPerson.role !== Role.deliveryPerson
+    ) {
+      throw new UnprocessableEntityException(
+        'User is not an active delivery person',
+      );
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { deliveryPersonId },
     });
 
     const totalAmount = order.cart.cartProducts.reduce(

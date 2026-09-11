@@ -178,7 +178,7 @@ generic field name.
 
 ## Phase 3 — Assigning an order to a delivery person
 
-- [ ] `OrdersService.assignDeliveryPerson`: validates the target user exists,
+- [x] `OrdersService.assignDeliveryPerson`: validates the target user exists,
       is active and has role `deliveryPerson`; rejects assignment unless the
       order is `paid` or `processing`; is idempotent for a re-assignment to the
       same person. Unit tests: `src/orders/orders.service.spec.ts`
