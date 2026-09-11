@@ -270,12 +270,12 @@ this phase along with two other `shipped`-status fixtures that needed a
       schema cannot express on its own" — that only a `deliveryPerson` may be
       assigned, that a delivery person's reads are scoped to their assignments,
       and who may advance to `delivered`
-- [ ] `docs/openapi.yaml`: the new enum values, `PATCH
+- [x] `docs/openapi.yaml`: the new enum values, `PATCH
       /orders/{orderId}/delivery-person`, the manager-only `deliveryPersonId`
       query filter, `POST /users`, and `deliveryPersonId` on the order
       schemas. Keep it the contract, with generated Swagger as the check on it
       (`implementation-notes.md` §4)
-- [ ] `docs/implementation-notes.md` §4: amend the "Optional features are out
+- [x] `docs/implementation-notes.md` §4: amend the "Optional features are out
       of scope" bullet — the delivery-person role and `delivered` are now
       implemented; promo codes and full status history remain out (unless
       Phase 8 is taken). Record the decisions listed at the top of this file
