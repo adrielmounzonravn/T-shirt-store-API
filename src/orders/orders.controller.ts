@@ -85,10 +85,11 @@ export class OrdersController {
   @ApiParam({ name: 'orderId', format: 'uuid' })
   @CheckPolicies((ability) => ability.can('update', 'Order'))
   @ApiOperation({
-    summary: 'Advance order status (Manager)',
+    summary: 'Advance order status (Manager, Delivery Person)',
     description:
-      'Manager can advance paid → processing → shipped. Transitions ' +
-      'outside the allowed flow return 422.',
+      'Manager can advance paid → processing → shipped. The assigned ' +
+      'delivery person can advance shipped → delivered on their own order, ' +
+      'and nothing else. Transitions outside the allowed flow return 422.',
   })
   @ApiResponse({
     status: 200,
@@ -99,8 +100,9 @@ export class OrdersController {
   advanceStatus(
     @Param('orderId', ParseUUIDPipe) orderId: string,
     @Body() dto: AdvanceOrderStatusDto,
+    @CurrentUser() user: JwtPayload,
   ): Promise<OrderEntity> {
-    return this.ordersService.advanceStatus(orderId, dto.status);
+    return this.ordersService.advanceStatus(orderId, dto.status, user);
   }
 
   @Patch(':orderId/delivery-person')

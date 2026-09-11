@@ -212,6 +212,7 @@ export class OrdersService {
   async advanceStatus(
     orderId: string,
     status: AdvanceableOrderStatus,
+    user: JwtPayload,
   ): Promise<OrderEntity> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -224,6 +225,20 @@ export class OrdersService {
 
     if (!order) {
       throw new NotFoundException('Order not found');
+    }
+    if (user.role === Role.deliveryPerson) {
+      if (order.deliveryPersonId !== user.sub) {
+        throw new ForbiddenException('You are not assigned to this order');
+      }
+      if (status !== OrderStatus.delivered) {
+        throw new ForbiddenException(
+          'Delivery person can only mark an order as delivered',
+        );
+      }
+    } else if (status === OrderStatus.delivered) {
+      throw new ForbiddenException(
+        'Only the assigned delivery person can mark an order as delivered',
+      );
     }
     if (ALLOWED_STATUS_ADVANCES[order.status] !== status) {
       throw new UnprocessableEntityException('State transition not allowed');

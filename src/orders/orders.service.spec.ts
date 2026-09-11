@@ -626,6 +626,13 @@ describe('OrdersService', () => {
 
   describe('advanceStatus', () => {
     const orderId = 'order-1';
+    const deliveryPersonId = 'delivery-1';
+    const otherDeliveryPersonId = 'delivery-2';
+
+    const deliveryUser: JwtPayload = {
+      sub: deliveryPersonId,
+      role: Role.deliveryPerson,
+    };
 
     const makeCartProduct = (overrides: Record<string, unknown> = {}) => ({
       skuId: 'sku-1',
@@ -644,6 +651,7 @@ describe('OrdersService', () => {
       status: OrderStatus.paid,
       paymentLink: 'https://buy.stripe.com/test',
       paymentIntent: null,
+      deliveryPersonId: null,
       createdAt: now,
       updatedAt: now,
       ...overrides,
@@ -682,12 +690,12 @@ describe('OrdersService', () => {
       const { service, prisma: advancePrisma } = await setupAdvance(null);
 
       await expect(
-        service.advanceStatus(orderId, OrderStatus.processing),
+        service.advanceStatus(orderId, OrderStatus.processing, managerUser),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(advancePrisma.order.update).not.toHaveBeenCalled();
     });
 
-    it('allows the paid -> processing transition and persists the new status', async () => {
+    it('allows a manager to drive paid -> processing and persists the new status', async () => {
       const updatedOrder = makeOrder({
         status: OrderStatus.processing,
         updatedAt: new Date('2024-06-02T00:00:00.000Z'),
@@ -700,20 +708,24 @@ describe('OrdersService', () => {
       const result = await service.advanceStatus(
         orderId,
         OrderStatus.processing,
+        managerUser,
       );
 
       expect(advancePrisma.order.update).toHaveBeenCalledTimes(1);
       expect(result).toEqual(
         expect.objectContaining({
           orderId,
+          cartNumber: 'cart-1',
           userId: clientUserId,
           status: OrderStatus.processing,
+          totalAmount: 51,
+          deliveryPersonId: null,
+          createdAt: now,
         }),
       );
     });
 
-    it('allows the processing -> shipped transition when a delivery person is assigned and persists the new status', async () => {
-      const deliveryPersonId = 'delivery-1';
+    it('allows a manager to drive processing -> shipped when a delivery person is assigned', async () => {
       const updatedOrder = makeOrder({
         status: OrderStatus.shipped,
         deliveryPersonId,
@@ -724,7 +736,11 @@ describe('OrdersService', () => {
         updatedOrder,
       );
 
-      const result = await service.advanceStatus(orderId, OrderStatus.shipped);
+      const result = await service.advanceStatus(
+        orderId,
+        OrderStatus.shipped,
+        managerUser,
+      );
 
       expect(advancePrisma.order.update).toHaveBeenCalledTimes(1);
       expect(result).toEqual(
@@ -743,13 +759,94 @@ describe('OrdersService', () => {
       );
 
       await expect(
-        service.advanceStatus(orderId, OrderStatus.shipped),
+        service.advanceStatus(orderId, OrderStatus.shipped, managerUser),
       ).rejects.toBeInstanceOf(UnprocessableEntityException);
       expect(advancePrisma.order.update).not.toHaveBeenCalled();
     });
 
-    it('allows the shipped -> delivered transition and persists the new status', async () => {
-      const deliveryPersonId = 'delivery-1';
+    it.each([
+      [OrderStatus.pending, OrderStatus.processing],
+      [OrderStatus.paid, OrderStatus.shipped],
+      [OrderStatus.shipped, OrderStatus.shipped],
+      [OrderStatus.cancelled, OrderStatus.processing],
+      [OrderStatus.processing, OrderStatus.processing],
+      [OrderStatus.pending, OrderStatus.shipped],
+    ])(
+      'throws UnprocessableEntityException for %s -> %s and does not call update',
+      async (currentStatus, requestedStatus) => {
+        const { service, prisma: advancePrisma } = await setupAdvance(
+          makeOrder({ status: currentStatus, deliveryPersonId }),
+        );
+
+        await expect(
+          service.advanceStatus(orderId, requestedStatus, managerUser),
+        ).rejects.toBeInstanceOf(UnprocessableEntityException);
+        expect(advancePrisma.order.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it('throws ForbiddenException when a manager attempts shipped -> delivered', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.shipped, deliveryPersonId }),
+      );
+
+      await expect(
+        service.advanceStatus(orderId, OrderStatus.delivered, managerUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(advancePrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when a client attempts shipped -> delivered', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.shipped, deliveryPersonId }),
+      );
+
+      await expect(
+        service.advanceStatus(orderId, OrderStatus.delivered, clientUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(advancePrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the requesting delivery person is not assigned to the order (unassigned)', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.shipped, deliveryPersonId: null }),
+      );
+
+      await expect(
+        service.advanceStatus(orderId, OrderStatus.delivered, deliveryUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(advancePrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the requesting delivery person is assigned to a different order', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({
+          status: OrderStatus.shipped,
+          deliveryPersonId: otherDeliveryPersonId,
+        }),
+      );
+
+      await expect(
+        service.advanceStatus(orderId, OrderStatus.delivered, deliveryUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(advancePrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it.each([[OrderStatus.processing], [OrderStatus.shipped]])(
+      'throws ForbiddenException when the assigned delivery person requests %s instead of delivered',
+      async (requestedStatus) => {
+        const { service, prisma: advancePrisma } = await setupAdvance(
+          makeOrder({ status: OrderStatus.paid, deliveryPersonId }),
+        );
+
+        await expect(
+          service.advanceStatus(orderId, requestedStatus, deliveryUser),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(advancePrisma.order.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it('allows the assigned delivery person to mark their own shipped order as delivered', async () => {
       const updatedOrder = makeOrder({
         status: OrderStatus.delivered,
         deliveryPersonId,
@@ -763,58 +860,22 @@ describe('OrdersService', () => {
       const result = await service.advanceStatus(
         orderId,
         OrderStatus.delivered,
+        deliveryUser,
       );
 
       expect(advancePrisma.order.update).toHaveBeenCalledTimes(1);
       expect(result).toEqual(
         expect.objectContaining({
           orderId,
+          cartNumber: 'cart-1',
           userId: clientUserId,
           status: OrderStatus.delivered,
           deliveryPersonId,
+          totalAmount: 51,
+          createdAt: now,
         }),
       );
     });
-
-    it('allows the shipped -> delivered transition even without a delivery person assigned', async () => {
-      const updatedOrder = makeOrder({
-        status: OrderStatus.delivered,
-        deliveryPersonId: null,
-        updatedAt: new Date('2024-06-04T00:00:00.000Z'),
-      });
-      const { service, prisma: advancePrisma } = await setupAdvance(
-        makeOrder({ status: OrderStatus.shipped, deliveryPersonId: null }),
-        updatedOrder,
-      );
-
-      const result = await service.advanceStatus(
-        orderId,
-        OrderStatus.delivered,
-      );
-
-      expect(advancePrisma.order.update).toHaveBeenCalledTimes(1);
-      expect(result.status).toBe(OrderStatus.delivered);
-    });
-
-    it.each([
-      [OrderStatus.pending, OrderStatus.processing],
-      [OrderStatus.paid, OrderStatus.shipped],
-      [OrderStatus.shipped, OrderStatus.shipped],
-      [OrderStatus.cancelled, OrderStatus.processing],
-      [OrderStatus.processing, OrderStatus.processing],
-    ])(
-      'throws UnprocessableEntityException for %s -> %s and does not call update',
-      async (currentStatus, requestedStatus) => {
-        const { service, prisma: advancePrisma } = await setupAdvance(
-          makeOrder({ status: currentStatus }),
-        );
-
-        await expect(
-          service.advanceStatus(orderId, requestedStatus),
-        ).rejects.toBeInstanceOf(UnprocessableEntityException);
-        expect(advancePrisma.order.update).not.toHaveBeenCalled();
-      },
-    );
 
     it('computes totalAmount from unitPrice * quantity across all cart items', async () => {
       const cartProducts = [
@@ -834,6 +895,7 @@ describe('OrdersService', () => {
       const result = await service.advanceStatus(
         orderId,
         OrderStatus.processing,
+        managerUser,
       );
 
       expect(result.totalAmount).toBe(25.5 * 2 + 10 * 3);
@@ -857,6 +919,7 @@ describe('OrdersService', () => {
       const result = await service.advanceStatus(
         orderId,
         OrderStatus.processing,
+        managerUser,
       );
 
       expect(result.paymentMethod).toBe('payment_link');
@@ -880,6 +943,7 @@ describe('OrdersService', () => {
       const result = await service.advanceStatus(
         orderId,
         OrderStatus.processing,
+        managerUser,
       );
 
       expect(result.paymentMethod).toBe('payment_intent');
@@ -890,7 +954,11 @@ describe('OrdersService', () => {
         makeOrder({ status: OrderStatus.paid }),
       );
 
-      await service.advanceStatus(orderId, OrderStatus.processing);
+      await service.advanceStatus(
+        orderId,
+        OrderStatus.processing,
+        managerUser,
+      );
 
       const argsString = JSON.stringify(
         advancePrisma.order.findUnique.mock.calls,

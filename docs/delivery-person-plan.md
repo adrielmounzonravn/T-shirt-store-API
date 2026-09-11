@@ -208,7 +208,7 @@ generic field name.
       `processing → shipped` on the order having an assignee (422, consistent
       with the existing out-of-flow error). Unit tests:
       `src/orders/orders.service.spec.ts`
-- [ ] Add the per-actor rule to `advanceStatus`: only the assigned delivery
+- [x] Add the per-actor rule to `advanceStatus`: only the assigned delivery
       person may set `delivered`, and a delivery person may set nothing else
       (403). **Blocked on Open decision 1.** Unit tests:
       `src/orders/orders.service.spec.ts`
@@ -216,7 +216,9 @@ generic field name.
       and that `cancel`'s "already shipped" reason string still reads correctly
       for a delivered order
 
-**Notes:**
+**Notes:** Open decision 1 resolved: only the assigned delivery person may
+set `delivered` (the plan's original assumption); the Manager gets 403 on
+that transition even though it still holds `update Order` generally.
 
 ## Phase 5 — Delivery history (read paths)
 
