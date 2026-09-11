@@ -357,7 +357,9 @@ export class OrdersService {
       const reason =
         order.status === OrderStatus.cancelled
           ? 'already cancelled'
-          : 'already shipped';
+          : order.status === OrderStatus.delivered
+            ? 'already delivered'
+            : 'already shipped';
       throw new UnprocessableEntityException(
         `The order is ${reason} and cannot be cancelled`,
       );

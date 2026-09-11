@@ -212,13 +212,17 @@ generic field name.
       person may set `delivered`, and a delivery person may set nothing else
       (403). **Blocked on Open decision 1.** Unit tests:
       `src/orders/orders.service.spec.ts`
-- [ ] Confirm `CANCELLABLE_STATUSES` still excludes `shipped` and `delivered`,
+- [x] Confirm `CANCELLABLE_STATUSES` still excludes `shipped` and `delivered`,
       and that `cancel`'s "already shipped" reason string still reads correctly
       for a delivered order
 
 **Notes:** Open decision 1 resolved: only the assigned delivery person may
 set `delivered` (the plan's original assumption); the Manager gets 403 on
 that transition even though it still holds `update Order` generally.
+
+`CANCELLABLE_STATUSES` already excluded `shipped`/`delivered`, but `cancel`'s
+reason string fell back to "already shipped" for a `delivered` order, which
+was factually wrong. Added an explicit `already delivered` branch.
 
 ## Phase 5 — Delivery history (read paths)
 

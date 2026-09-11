@@ -954,11 +954,7 @@ describe('OrdersService', () => {
         makeOrder({ status: OrderStatus.paid }),
       );
 
-      await service.advanceStatus(
-        orderId,
-        OrderStatus.processing,
-        managerUser,
-      );
+      await service.advanceStatus(orderId, OrderStatus.processing, managerUser);
 
       const argsString = JSON.stringify(
         advancePrisma.order.findUnique.mock.calls,
@@ -1054,6 +1050,21 @@ describe('OrdersService', () => {
         expect(cancelPrisma.order.update).not.toHaveBeenCalled();
       },
     );
+
+    it('throws UnprocessableEntityException with an "already delivered" message when status is delivered, and does not call update', async () => {
+      const { service, prisma: cancelPrisma } = await setupCancel(
+        makeOrder({ status: OrderStatus.delivered }),
+      );
+
+      const promise = service.cancel(orderId, clientUser);
+
+      await expect(promise).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+      await expect(promise).rejects.toThrow('already delivered');
+      await expect(promise).rejects.not.toThrow('already shipped');
+      expect(cancelPrisma.order.update).not.toHaveBeenCalled();
+    });
 
     it.each([
       [OrderStatus.pending],
