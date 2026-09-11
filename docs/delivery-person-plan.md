@@ -304,4 +304,8 @@ history" is in scope. Leave every box unticked otherwise, and say so in Notes.
 - [ ] Expose the history on the order detail read, and sync `docs/db-schema.md`
       + `docs/openapi.yaml`
 
-**Notes:**
+**Notes:** Open decision 2 resolved as "not taken" — Phase 7 already closed
+`docs/challenge.md` and `implementation-notes.md` §4 with full per-order
+status history recorded as remaining out of scope. Left unticked per this
+phase's own instruction ("leave every box unticked otherwise, and say so in
+Notes").
