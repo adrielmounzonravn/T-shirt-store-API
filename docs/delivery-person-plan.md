@@ -242,19 +242,26 @@ was factually wrong. Added an explicit `already delivered` branch.
 
 ## Phase 6 — E2E coverage
 
-- [ ] Written by a subagent that did not implement Phases 0-5, against the
+- [x] Written by a subagent that did not implement Phases 0-5, against the
       real Postgres Testcontainer (`test/e2e/global-setup.ts` runs
       `prisma migrate deploy`, so Phase 0's migration is picked up
       automatically; `seedUser` already accepts a `role`)
-- [ ] New `test/deliveries.e2e-spec.ts`: Manager creates a delivery person,
+- [x] New `test/deliveries.e2e-spec.ts`: Manager creates a delivery person,
       assigns a paid order, the delivery person lists only their assigned
       orders and reads one, marks it `delivered`, and is refused on an order
       that is not theirs
-- [ ] Extend `test/orders.e2e-spec.ts`'s status block (L445-595) with
+- [x] Extend `test/orders.e2e-spec.ts`'s status block (L445-595) with
       `processing → shipped` refused without an assignee and
       `shipped → delivered` accepted, keeping the existing cases green
 
-**Notes:**
+**Notes:** both suites were written by fresh subagents (two separate agents,
+one per file) given only the HTTP contract/DTOs/harness conventions, not the
+service/controller/CASL implementation. Confirmed the pre-existing
+regression flagged in Phase 0's notes: `orders.e2e-spec.ts`'s "manager
+advances processing to shipped" test was failing (422, not 200) before this
+phase, since Phase 4 gates that transition on an assignee; fixed as part of
+this phase along with two other `shipped`-status fixtures that needed a
+`deliveryPersonId` to satisfy the DB CHECK constraint.
 
 ## Phase 7 — Docs sync
 
