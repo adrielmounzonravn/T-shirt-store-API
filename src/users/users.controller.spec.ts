@@ -61,7 +61,35 @@ describe('UsersController', () => {
       await usersController.create(dto);
 
       expect(createMock).toHaveBeenCalledTimes(1);
-      expect(createMock).toHaveBeenCalledWith(dto);
+      expect(createMock).toHaveBeenCalledWith({ ...dto, isVerified: true });
+    });
+
+    it('always forces isVerified: true, regardless of what the dto contains', async () => {
+      const dto = {
+        email: 'delivery.person@example.com',
+        password: 'password123',
+        fullName: 'Jane Delivery',
+        role: Role.deliveryPerson,
+        isVerified: false,
+      } as CreateDeliveryPersonDto;
+      createMock.mockResolvedValue(
+        new UserEntity({
+          id: 'user-id',
+          email: dto.email,
+          password: 'hashed',
+          fullName: dto.fullName,
+          role: Role.deliveryPerson,
+          isActive: true,
+          isVerified: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      );
+
+      await usersController.create(dto);
+
+      const [callArg] = createMock.mock.calls[0] as [{ isVerified: boolean }];
+      expect(callArg.isVerified).toBe(true);
     });
 
     it('resolves with whatever usersService.create resolved with', async () => {

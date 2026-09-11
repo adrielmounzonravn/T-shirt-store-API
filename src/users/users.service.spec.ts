@@ -127,7 +127,7 @@ describe('UsersService', () => {
       expect(data.password).not.toBe(input.password);
     });
 
-    it('persists only email, hashed password, fullName, and role', async () => {
+    it('persists only email, hashed password, fullName, role, and isVerified', async () => {
       prisma.user.create.mockResolvedValue(userRow);
 
       await service.create(input);
@@ -138,22 +138,41 @@ describe('UsersService', () => {
         password: HASHED_PASSWORD,
         fullName: input.fullName,
         role: Role.client,
+        isVerified: false,
       });
     });
 
-    it('does not forward a caller-supplied isActive or isVerified to Prisma', async () => {
+    it('defaults isVerified to false when not provided', async () => {
+      prisma.user.create.mockResolvedValue(userRow);
+
+      await service.create(input);
+
+      const data = lastCreateData(prisma.user.create);
+      expect(data.isVerified).toBe(false);
+    });
+
+    it('forwards a caller-supplied isVerified: true to Prisma', async () => {
+      const verifiedRow = { ...userRow, isVerified: true };
+      prisma.user.create.mockResolvedValue(verifiedRow);
+
+      const result = await service.create({ ...input, isVerified: true });
+
+      const data = lastCreateData(prisma.user.create);
+      expect(data.isVerified).toBe(true);
+      expect(result.isVerified).toBe(true);
+    });
+
+    it('does not expose isActive as a settable field, even if the caller supplies one', async () => {
       prisma.user.create.mockResolvedValue(userRow);
       const maliciousInput = {
         ...input,
-        isActive: true,
-        isVerified: true,
-      };
+        isActive: false,
+      } as typeof input & { isActive: boolean };
 
       await service.create(maliciousInput);
 
       const data = lastCreateData(prisma.user.create);
       expect(data).not.toHaveProperty('isActive');
-      expect(data).not.toHaveProperty('isVerified');
     });
 
     it('always persists role as client for the sign-up path, regardless of other input properties', async () => {

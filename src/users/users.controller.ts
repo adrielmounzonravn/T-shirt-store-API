@@ -39,6 +39,6 @@ export class UsersController {
   })
   @ApiErrorResponses(400, 401, 403, 409)
   create(@Body() dto: CreateDeliveryPersonDto): Promise<UserEntity> {
-    return this.usersService.create(dto);
+    return this.usersService.create({ ...dto, isVerified: true });
   }
 }

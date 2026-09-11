@@ -10,6 +10,7 @@ export interface CreateUserInput {
   password: string;
   fullName: string;
   role?: Role;
+  isVerified?: boolean;
 }
 
 @Injectable()
@@ -31,6 +32,7 @@ export class UsersService {
         password: hashedPassword,
         fullName: input.fullName,
         role: input.role ?? Role.client,
+        isVerified: input.isVerified ?? false,
       },
     });
 
