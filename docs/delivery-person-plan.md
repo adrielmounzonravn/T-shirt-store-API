@@ -202,7 +202,7 @@ generic field name.
 
 ## Phase 4 — `shipped → delivered`
 
-- [ ] Extend `ADVANCEABLE_STATUSES` in `src/orders/dto/advance-order-status.dto.ts`
+- [x] Extend `ADVANCEABLE_STATUSES` in `src/orders/dto/advance-order-status.dto.ts`
       with `delivered`
 - [ ] Extend `ALLOWED_STATUS_ADVANCES` with `shipped → delivered`, and gate
       `processing → shipped` on the order having an assignee (422, consistent
