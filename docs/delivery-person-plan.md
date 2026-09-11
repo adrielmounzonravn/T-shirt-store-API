@@ -283,7 +283,7 @@ this phase along with two other `shipped`-status fixtures that needed a
       delivery-person bullet has been picked up post-checkpoint; and update
       `CLAUDE.md`'s "Nothing from `docs/challenge.md`'s Scope — optional
       features excluded is in scope" line accordingly
-- [ ] `docs/ai-module/writeup.md`: fill in the **Improvement**, before/after
+- [x] `docs/ai-module/writeup.md`: fill in the **Improvement**, before/after
       and evidence rows for this change, since this is the AI-module
       improvement on branch `ai-module/delivery-person-role`
 
