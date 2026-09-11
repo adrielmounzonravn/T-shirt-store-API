@@ -23,6 +23,7 @@ import { CheckPolicies } from '../casl/decorators/check-policies.decorator.js';
 import { ApiErrorResponses } from '../common/decorators/api-error-responses.decorator.js';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto.js';
 import { AdvanceOrderStatusDto } from './dto/advance-order-status.dto.js';
+import { AssignDeliveryPersonDto } from './dto/assign-delivery-person.dto.js';
 import { OrderListEntity } from './entities/order-list.entity.js';
 import { OrderDetailEntity } from './entities/order-detail.entity.js';
 import { OrderEntity } from '../checkout/entities/order.entity.js';
@@ -100,6 +101,32 @@ export class OrdersController {
     @Body() dto: AdvanceOrderStatusDto,
   ): Promise<OrderEntity> {
     return this.ordersService.advanceStatus(orderId, dto.status);
+  }
+
+  @Patch(':orderId/delivery-person')
+  @ApiParam({ name: 'orderId', format: 'uuid' })
+  @CheckPolicies((ability) => ability.can('assign', 'Order'))
+  @ApiOperation({
+    summary: 'Assign a delivery person to an order (Manager)',
+    description:
+      'Only allowed while the order is paid or processing. Reassigning to ' +
+      'a different delivery person replaces the previous assignment; ' +
+      're-assigning the same person is idempotent.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Delivery person assigned',
+    type: OrderEntity,
+  })
+  @ApiErrorResponses(401, 403, 404, 422)
+  assignDeliveryPerson(
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() dto: AssignDeliveryPersonDto,
+  ): Promise<OrderEntity> {
+    return this.ordersService.assignDeliveryPerson(
+      orderId,
+      dto.deliveryPersonId,
+    );
   }
 
   @Patch(':orderId/cancel')

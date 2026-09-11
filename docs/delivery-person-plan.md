@@ -182,7 +182,7 @@ generic field name.
       is active and has role `deliveryPerson`; rejects assignment unless the
       order is `paid` or `processing`; is idempotent for a re-assignment to the
       same person. Unit tests: `src/orders/orders.service.spec.ts`
-- [ ] `PATCH /orders/{orderId}/delivery-person` in `src/orders/orders.controller.ts`,
+- [x] `PATCH /orders/{orderId}/delivery-person` in `src/orders/orders.controller.ts`,
       gated on `ability.can('assign', 'Order')`, with its DTO
       (`deliveryPersonId`, UUID)
 - [ ] Expose `deliveryPersonId` (and the delivery person's name/email on the
