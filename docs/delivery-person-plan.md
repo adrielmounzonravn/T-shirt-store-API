@@ -234,7 +234,7 @@ was factually wrong. Added an explicit `already delivered` branch.
 - [x] Add a Manager-only `deliveryPersonId` filter to
       `src/orders/dto/list-orders-query.dto.ts`, mirroring how the existing
       manager-only `userId` filter is handled
-- [ ] Extend the ownership check in `findOne` (L158) so a delivery person can
+- [x] Extend the ownership check in `findOne` (L158) so a delivery person can
       read an order assigned to them and 403s on any other. Unit tests:
       `src/orders/orders.service.spec.ts`
 

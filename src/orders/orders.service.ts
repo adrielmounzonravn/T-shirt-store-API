@@ -173,7 +173,11 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    if (user.role !== Role.manager && order.cart.userId !== user.sub) {
+    if (user.role === Role.deliveryPerson) {
+      if (order.deliveryPersonId !== user.sub) {
+        throw new ForbiddenException('You do not have access to this order');
+      }
+    } else if (user.role !== Role.manager && order.cart.userId !== user.sub) {
       throw new ForbiddenException('You do not have access to this order');
     }
 

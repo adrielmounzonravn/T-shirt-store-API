@@ -233,10 +233,7 @@ describe('OrdersService', () => {
     });
 
     it('ignores query.deliveryPersonId for a client and scopes to the client own id', async () => {
-      await service.findMany(
-        baseQuery({ deliveryPersonId }),
-        clientUser,
-      );
+      await service.findMany(baseQuery({ deliveryPersonId }), clientUser);
 
       const argsString = allCallArgsAsString(prisma.$queryRaw);
       expect(argsString).toContain(clientUserId);
@@ -684,6 +681,36 @@ describe('OrdersService', () => {
         findOnePrisma.order.findUnique.mock.calls,
       );
       expect(argsString).toContain(orderId);
+    });
+
+    it('returns the order for a delivery person assigned to it', async () => {
+      const { service } = await setupFindUnique(
+        makeOrderWithCart({ deliveryPersonId: deliveryUser.sub }),
+      );
+
+      const result = await service.findOne(orderId, deliveryUser);
+
+      expect(result.orderId).toBe(orderId);
+    });
+
+    it('throws ForbiddenException when a delivery person requests an order assigned to another delivery person', async () => {
+      const { service } = await setupFindUnique(
+        makeOrderWithCart({ deliveryPersonId: otherDeliveryUser.sub }),
+      );
+
+      await expect(
+        service.findOne(orderId, deliveryUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when a delivery person requests an order with no delivery person assigned', async () => {
+      const { service } = await setupFindUnique(
+        makeOrderWithCart({ deliveryPersonId: null }),
+      );
+
+      await expect(
+        service.findOne(orderId, deliveryUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     describe('delivery person assignment', () => {
