@@ -226,7 +226,7 @@ was factually wrong. Added an explicit `already delivered` branch.
 
 ## Phase 5 — Delivery history (read paths)
 
-- [ ] Scope `OrdersService.findMany` for a delivery person to
+- [x] Scope `OrdersService.findMany` for a delivery person to
       `delivery_person_id = user.sub` (currently `isManager ? query.userId :
       user.sub` on `cn.user_id`, L55-56) so every existing filter, price range
       and pagination option keeps working. Unit tests:

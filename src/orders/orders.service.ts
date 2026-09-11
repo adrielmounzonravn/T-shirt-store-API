@@ -60,10 +60,13 @@ export class OrdersService {
     const { limit, offset, dateFrom, dateTo, status, minPrice, maxPrice } =
       query;
     const isManager = user.role === Role.manager;
+    const isDeliveryPerson = user.role === Role.deliveryPerson;
     const targetUserId = isManager ? query.userId : user.sub;
 
     const conditions: Prisma.Sql[] = [];
-    if (targetUserId) {
+    if (isDeliveryPerson) {
+      conditions.push(Prisma.sql`o.delivery_person_id = ${user.sub}::uuid`);
+    } else if (targetUserId) {
       conditions.push(Prisma.sql`cn.user_id = ${targetUserId}::uuid`);
     }
     if (dateFrom) {

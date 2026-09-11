@@ -21,6 +21,14 @@ describe('OrdersService', () => {
 
   const clientUser: JwtPayload = { sub: clientUserId, role: Role.client };
   const managerUser: JwtPayload = { sub: 'manager-1', role: Role.manager };
+  const deliveryUser: JwtPayload = {
+    sub: 'delivery-1',
+    role: Role.deliveryPerson,
+  };
+  const otherDeliveryUser: JwtPayload = {
+    sub: 'delivery-2',
+    role: Role.deliveryPerson,
+  };
 
   const baseQuery = (
     overrides: Partial<ListOrdersQueryDto> = {},
@@ -86,6 +94,56 @@ describe('OrdersService', () => {
 
       const argsString = allCallArgsAsString(prisma.$queryRaw);
       expect(argsString).toContain(otherUserId);
+    });
+
+    it('scopes a delivery person to orders assigned to them', async () => {
+      await service.findMany(baseQuery(), deliveryUser);
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(deliveryUser.sub);
+    });
+
+    it('ignores query.userId for a delivery person and scopes to their own id', async () => {
+      await service.findMany(baseQuery({ userId: otherUserId }), deliveryUser);
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(deliveryUser.sub);
+      expect(argsString).not.toContain(otherUserId);
+    });
+
+    it('scopes two different delivery persons to their own distinct id', async () => {
+      await service.findMany(baseQuery(), deliveryUser);
+      const firstArgsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(firstArgsString).toContain(deliveryUser.sub);
+      expect(firstArgsString).not.toContain(otherDeliveryUser.sub);
+
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([makeOrderRow()])
+        .mockResolvedValueOnce([{ count: 1 }]);
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      await service.findMany(baseQuery(), otherDeliveryUser);
+      const secondArgsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(secondArgsString).toContain(otherDeliveryUser.sub);
+      expect(secondArgsString).not.toContain(deliveryUser.sub);
+    });
+
+    it('ignores a query.userId matching another delivery person and does not leak it into the args', async () => {
+      await service.findMany(
+        baseQuery({ userId: otherDeliveryUser.sub }),
+        deliveryUser,
+      );
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(deliveryUser.sub);
+      expect(argsString).not.toContain(otherDeliveryUser.sub);
     });
   });
 
