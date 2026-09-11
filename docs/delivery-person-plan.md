@@ -265,7 +265,7 @@ this phase along with two other `shipped`-status fixtures that needed a
 
 ## Phase 7 — Docs sync
 
-- [ ] `docs/db-schema.md`: add `deliveryPerson` / `delivered` to the DBML
+- [x] `docs/db-schema.md`: add `deliveryPerson` / `delivered` to the DBML
       enums, `orders.delivery_person_id` plus its `Ref`, and — in "Rules the
       schema cannot express on its own" — that only a `deliveryPerson` may be
       assigned, that a delivery person's reads are scoped to their assignments,
