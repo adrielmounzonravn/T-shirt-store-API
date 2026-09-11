@@ -279,7 +279,7 @@ this phase along with two other `shipped`-status fixtures that needed a
       of scope" bullet — the delivery-person role and `delivered` are now
       implemented; promo codes and full status history remain out (unless
       Phase 8 is taken). Record the decisions listed at the top of this file
-- [ ] `docs/challenge.md`: note next to L129 and the Scope list that the
+- [x] `docs/challenge.md`: note next to L129 and the Scope list that the
       delivery-person bullet has been picked up post-checkpoint; and update
       `CLAUDE.md`'s "Nothing from `docs/challenge.md`'s Scope — optional
       features excluded is in scope" line accordingly
