@@ -87,6 +87,15 @@ done. If the step touches a critical e2e path, also run
 failures — in either the implementation or, after review, in a test that
 was wrong — before moving on. Do not weaken a test to make it pass.
 
+**Hard constraint: local or Testcontainer database only.** Any migration
+(`npx prisma migrate dev`, `migrate deploy`, etc.) or e2e test run as part
+of this step must target a local Postgres or the Testcontainers instance
+`test/e2e/global-setup.ts` spins up — never a shared, hosted, or production
+database. Check `DATABASE_URL` before running either. This is non-negotiable
+regardless of what a step seems to call for: a migration applied to a
+hosted deployment before the app logic satisfying its constraints exists is
+exactly how a past incident happened (see GitHub issue #2).
+
 For a broader pass across the whole diff (standards compliance, spec
 compliance, bottleneck/future-risk scan), hand off to `/review-and-verify`
 rather than duplicating that work here — this skill's own checks are a
