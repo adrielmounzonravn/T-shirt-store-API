@@ -123,6 +123,22 @@ processing→shipped; 422 on already-shipped for out-of-flow and for cancel).
 This is expected sequencing, not a regression to fix in Phase 0-3 — Phase 4
 must update those fixtures/expectations, or Phase 6 will need to.
 
+**Production remediation:** the demo Supabase deployment (`docs/deployment-plan.md`)
+applied this migration before Phase 4's app logic existed, leaving
+`chk_shipped_delivered_has_assignee` unsatisfiable and the demo app unable to
+advance orders to `shipped`/`delivered`. The path being taken: merge this
+branch (`ai-module/delivery-person-role`, Phase 4 onward) into `main` and
+redeploy the demo app, since Phase 4 populates `deliveryPersonId` before
+setting either status, making the constraint satisfiable again. Had this
+branch not been merged, the alternative would have been a follow-up migration
+dropping just the CHECK constraint until the branch landed — not an option
+here since Postgres can't revert the migration's two `ALTER TYPE ... ADD
+VALUE` statements (enum values, once added, can't be dropped), so the
+remediation has to work around that rather than rolling it back. Adriel
+Mounzon (repo owner) approved running this migration against the demo
+deployment via the Supabase MCP `apply_migration` call described in
+`docs/deployment-plan.md` Step 2.
+
 ## Phase 1 — Authorization (CASL + guards)
 
 - [x] Restructure `createForUser` into explicit per-role branches so the
