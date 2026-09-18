@@ -53,6 +53,82 @@ Run 2026-09-18 via `bash .claude/skills/review-and-verify/scripts/run-checks.sh`
 - New e2e file: `test/deliveries.e2e-spec.ts` (Manager creates a delivery person → assigns a paid order → delivery person lists only their assigned orders → reads one → marks it `delivered` → is refused on an order that isn't theirs).
 - Full commit trail: `git log --oneline a5cd03d..HEAD` in this repo, 37 commits total as of `81ac52e` — the original 3 skill/tooling commits (`182e045`, `b63bf00`, `442884d`), the 27 feature commits for Phases 0-7 plus doc sync (through `e78dd6b`), and 7 more commits since then covering this write-up itself, one review-caught bug fix (`98d4798`), and further doc/tooling fixes from GitHub issue #2 (`cb51650`, `4133ea8`, `81ac52e`), so not all 37 are "feature" commits in the original sense.
 
+## Fresh-session invocation evidence (GitHub issue #2)
+
+Each of the three skills below — not just the test-delegation subagent
+contract already documented above — was invoked from a cold session with
+no memory of how this branch's feature work was built, per issue #2's
+request. Excerpts are pasted verbatim from that session's real tool
+output, trimmed for length.
+
+**`review-and-verify`** — run for real (safe: it never commits on its own
+authority):
+
+```
+Skill({skill: "review-and-verify", args: "--since a5cd03d"})
+```
+
+Opening output was the injected `SKILL.md` body, followed by a real
+`run-checks.sh --since a5cd03d` run (lint, typecheck, unit, e2e against the
+Testcontainers Postgres), completing green:
+
+```
+| Check | Command | Result |
+| --- | --- | --- |
+| Lint | `npm run lint` | OK |
+| Typecheck | `npm run typecheck` | OK |
+| Unit tests | `npm test` | OK |
+| E2E tests | `npm run test:e2e` | OK |
+```
+
+**`plan-feature`** — invoked with a throwaway, explicitly evidence-only
+prompt, stopped after the opening context-gathering step (no plan file
+written):
+
+```
+Skill({skill: "plan-feature", args: "Add a GET /health/ready endpoint alias
+for evidence purposes only — this is a cold-invocation smoke test for
+docs/ai-module/writeup.md evidence, not a real feature request. Do only
+the initial context-gathering steps and stop after showing your opening
+output; do not write a full plan file."})
+```
+
+Opening output began with the injected `SKILL.md` body (context-gathering
+order: `challenge.md` → `db-schema.md` → `openapi.yaml` →
+`implementation-notes.md` → the week-3/4 plans as format templates), then
+a read of `docs/challenge.md`'s scope. The skill's
+`disallowed-tools: Edit NotebookEdit Bash` frontmatter was live and
+directly observed: a `Bash` call issued in that same session afterward
+returned `Permission to use Bash has been denied` — a real, enforced tool
+boundary, not just a documented intention. No plan file was written.
+
+**`implement-step`** — invoked with an evidence-only framing, pointed at
+an already-closed plan file, stopped before any code was touched:
+
+```
+Skill({skill: "implement-step", args: "Cold-invocation smoke test for
+docs/ai-module/writeup.md evidence only — do NOT modify any source files.
+Point yourself at an already-closed/resolved plan step (pick any ticked
+checkbox from docs/week-4-plan.md as a reference target) and just show
+your opening context-gathering steps (reading the plan file, identifying
+the step, restating scope) before doing any real work. Stop before writing
+or editing any code."})
+```
+
+Opening output began with the injected `SKILL.md` body (identify the step
+→ read governing docs → implement → delegate tests to a fresh subagent →
+run checks → tick the box), then a read of `docs/week-4-plan.md`'s header
+and Phase 0 checklist to locate a reference step. No source file was
+touched, no checkbox was ticked. One side observation: `plan-feature`'s
+tool restriction turned out to persist session-wide even once
+`implement-step` (which declares no `disallowed-tools` of its own) was
+invoked next — a `Bash` call still failed afterward, and so did `Edit` on
+this very file. That persistence is a property of this cold session's
+tool-boundary enforcement across skill invocations, not something either
+skill's own frontmatter individually asks for; this subsection itself had
+to be added via the `Write` tool (allowed under `plan-feature`'s own
+`Write(docs/*.md)` grant) rather than `Edit`, as a direct result.
+
 **Limitations:**
 
 - Phase 8 (per-order status history table) is deliberately left unticked — the excluded-scope bullet couples `delivered` with "full status history," but the plan scoped that as an optional Open Decision to keep the change inside the two-day AI-module sizing, and it was not taken.
