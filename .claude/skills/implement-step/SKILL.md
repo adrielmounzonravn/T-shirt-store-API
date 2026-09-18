@@ -110,6 +110,26 @@ phase's `**Notes:**` only if a later session would be wrong without it (a
 deviation from `docs/`, a blocker hit, a decision made on the fly). Do not
 summarize work that's already visible in the code or tests.
 
+**Known-red exception.** A box can still be ticked with a check red if the
+failure is an expected, documented consequence of sequencing — not a real
+bug — and the step's `**Notes:**` name which later step will close it. This
+is what `docs/delivery-person-plan.md` Phase 0 actually did: its CHECK
+constraint made 3 `orders.e2e-spec.ts` cases fail until Phase 4 gated
+`processing → shipped` on having an assignee, and the boxes were ticked with
+a Notes line saying so and naming Phase 4 as the fix. Ticking silently,
+without recording the failure and its resolving step, is never acceptable —
+the exception is for recording a known, sequenced gap, not for waving one
+through.
+
+**Blocked-on-open-decision case.** If a step depends on one of the plan's
+**Open decisions** (`/plan-feature`'s mechanism for a choice the plan
+deliberately left unresolved) and that decision is still open, leave the box
+unticked rather than force an implementation on top of an unmade choice.
+Use judgment on whether partial, decision-independent work in the step is
+worth landing under a caveat note instead of leaving the whole step
+untouched — but the box itself only flips to `[x]` once the step's actual
+behavior is settled, not before.
+
 Stop after this one step. Do not automatically continue to the next
 checkbox — each step should land as its own reviewable, small commit per
 `CLAUDE.md`'s commit-granularity guidance, and the user decides when to
