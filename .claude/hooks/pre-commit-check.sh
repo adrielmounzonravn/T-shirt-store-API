@@ -14,8 +14,11 @@ while IFS= read -r segment; do
 done < <(echo "$command" | sed -E 's/(&&|\|\||;|\|)/\n/g')
 
 if [[ "$matched" -eq 1 ]]; then
-  npm run lint 1>&2 && npm run typecheck 1>&2 && npm test 1>&2 && npm run test:e2e 1>&2
-  exit $?
+  if npm run lint 1>&2 && npm run typecheck 1>&2 && npm test 1>&2 && npm run test:e2e 1>&2; then
+    exit 0
+  else
+    exit 2
+  fi
 fi
 
 exit 0
