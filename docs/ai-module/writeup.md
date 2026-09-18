@@ -25,6 +25,17 @@
 | Unit tests | `npm test` | 485/485 passing (28 files) |
 | E2E tests | `npm run test:e2e` | 93/93 passing (7 files) |
 
+### Current state (commit `81ac52e`, this step's HEAD) — real `run-checks.sh` output
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Lint | `npm run lint` | OK |
+| Typecheck | `npm run typecheck` | OK |
+| Unit tests | `npm test` | OK |
+| E2E tests | `npm run test:e2e` | OK |
+
+Run 2026-09-18 via `bash .claude/skills/review-and-verify/scripts/run-checks.sh`, Docker running for the e2e Testcontainer. The script's `Result` column is only ever `OK`, `FAIL (see <path>)`, or `SKIPPED` — it does not print pass counts. The underlying `npm test`/`npm run test:e2e` output for that same run reported **559/559 passing (32 files)** and **132/132 passing (8 files)** respectively (see Evidence below).
+
 ## Project Results
 
 **Before → after:**
@@ -37,10 +48,10 @@
 **Evidence:**
 
 - Baseline (recorded at branch creation, commit `a5cd03d`): build OK; lint 0 errors/6 pre-existing warnings; unit 485/485 (28 files); e2e 93/93 (7 files) — see the Baseline table above.
-- Current state (commit `e78dd6b`, this step's HEAD): `npm run build` OK; `npm run lint` → 0 errors, the same 6 pre-existing `no-unsafe-argument` warnings (no new lint debt); `npm test` → **556/556 passing (32 files)**, run 2026-09-11; `npm run test:e2e` → **132/132 passing (8 files)**, run 2026-09-11 against the real `postgres:17-alpine` Testcontainer (`test/e2e/global-setup.ts`), no mocked database. The one `[AllExceptionsFilter] Unhandled exception` line in the e2e output is expected: a deliberate raw-throw/unknown-error assertion in `all-exceptions.filter.spec.ts` and a stock-notification job test exercising a not-found path, not a real failure.
+- Current state (commit `81ac52e`, this step's HEAD): `npm run lint` OK, `npm run typecheck` OK — see the "Current state" table above, run for real via `run-checks.sh`; `npm test` → **559/559 passing (32 files)**, run 2026-09-18; `npm run test:e2e` → **132/132 passing (8 files)**, run 2026-09-18 against the real `postgres:17-alpine` Testcontainer (`test/e2e/global-setup.ts`), no mocked database. The one `[AllExceptionsFilter] Unhandled exception` line in the e2e output is expected: a deliberate raw-throw/unknown-error assertion in `all-exceptions.filter.spec.ts` and a stock-notification job test exercising a not-found path, not a real failure.
 - Pre/post comparison for the sequencing bug: before Phase 4, `processing → shipped` in `orders.e2e-spec.ts` returned 200 with no assignee (the old behavior); `test/deliveries.e2e-spec.ts` and the Phase 6-extended `orders.e2e-spec.ts` now assert it 422s without a `deliveryPersonId` and 200s with one — both fresh subagent-written suites, not touched by the implementer.
 - New e2e file: `test/deliveries.e2e-spec.ts` (Manager creates a delivery person → assigns a paid order → delivery person lists only their assigned orders → reads one → marks it `delivered` → is refused on an order that isn't theirs).
-- Full commit trail: `git log --oneline a5cd03d..HEAD` in this repo, 27 feature commits plus the 3 skill/tooling commits (`182e045`, `b63bf00`, `442884d`).
+- Full commit trail: `git log --oneline a5cd03d..HEAD` in this repo, 37 commits total as of `81ac52e` — the original 3 skill/tooling commits (`182e045`, `b63bf00`, `442884d`), the 27 feature commits for Phases 0-7 plus doc sync (through `e78dd6b`), and 7 more commits since then covering this write-up itself, one review-caught bug fix (`98d4798`), and further doc/tooling fixes from GitHub issue #2 (`cb51650`, `4133ea8`, `81ac52e`), so not all 37 are "feature" commits in the original sense.
 
 **Limitations:**
 
