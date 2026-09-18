@@ -27,6 +27,56 @@ of docs/challenge.md's excluded-scope list it picks up>
 
 ---
 
+## Decisions this plan assumes
+
+> template note: record every non-obvious choice the plan makes without
+> escalating it to the user — the "why this and not that" a later session
+> would otherwise have to re-derive or, worse, silently redo differently.
+> One bullet per decision, bold the decision itself, then justify it in a
+> sentence or two with a pointer to the code/doc that makes it true. If any
+> assumption here is actually unresolved rather than settled, it belongs in
+> **Open decisions** below instead, not here.
+
+- <e.g. **Assignment lives on `orders`, not in a join table.** One order has
+  at most one delivery person, so a nullable FK is enough — see
+  `prisma/schema.prisma` L<n>>
+- <...>
+
+### Open decisions (block the steps that name them)
+
+> template note: unresolved choices the plan deliberately leaves for the
+> implementer/user to settle — not things you forgot to decide, but things
+> only they can decide (a product/policy call, a tradeoff with no clearly
+> better default). Number them, state the options, and name which phase/step
+> is blocked on each so `/implement-step` knows to stop and ask rather than
+> guess. Delete this subsection only if the feature genuinely has none —
+> that should be rare enough to double-check.
+
+1. <e.g. **Who may set `delivered`** — the assigned delivery person only, or
+   the Manager as well? Affects Phase <n>.>
+2. <...>
+
+## Code seams this feature touches
+
+> template note: the concrete files/symbols this feature will touch or add,
+> found via Explore/grep during context-gathering — listed so a later
+> session doesn't have to re-discover them. Group by area (schema, CASL/auth,
+> the service(s), controller/DTOs/entities, specs) and cite line ranges where
+> they help (they will drift as code changes, but even an approximate pointer
+> saves a search). This is a map, not a spec — it says where, not what to
+> write there.
+
+- `prisma/schema.prisma` — <enums/models this feature adds fields or values
+  to, with line ranges>
+- `src/casl/casl-ability.factory.ts` — <the ability branches affected>
+- `<service>.ts` — <the specific exported methods/constants this feature
+  changes or adds>
+- `<controller>.ts`, `<dto>.ts`, `<entity>.ts` — <endpoints/fields affected>
+- Specs: <every `*.spec.ts` / `*.e2e-spec.ts` file that will need new or
+  updated cases>
+
+---
+
 ## Phase 0 — Schema and migration
 
 - [ ] <e.g. add `deliveryPerson` to the `Role` enum in

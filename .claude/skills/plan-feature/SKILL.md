@@ -47,8 +47,21 @@ seams the feature will touch — e.g. for a new role: the `Role` enum in
 `prisma/schema.prisma`, `src/casl/casl-ability.factory.ts`, the roles
 guard/decorator, and any service enforcing state transitions (such as
 `OrderStatus` advances in `src/orders/orders.service.ts`). List these file
-paths in the plan so a later `/implement-step` run does not have to
-re-discover them.
+paths in the plan's **Code seams this feature touches** section so a later
+`/implement-step` run does not have to re-discover them.
+
+While gathering context, also track two other things as you go, for the
+**Decisions this plan assumes** section:
+
+- Any non-obvious choice you make in shaping the plan (a data-model shape, an
+  endpoint boundary, a reuse-vs-new-endpoint call) that you are *not* going to
+  escalate to the user — write it down as an assumed decision with its
+  rationale, rather than letting it live only implicitly in how a step is
+  worded.
+- Any choice that genuinely has no clearly-better default (a product/policy
+  call, e.g. who is allowed to perform a new transition) — that is an *open*
+  decision: list it under **Open decisions** and name which phase/step is
+  blocked on it, instead of silently picking one.
 
 ### 2. Decide phases and steps
 
@@ -86,6 +99,11 @@ instructional comments. Keep the same conventions as
   only what a later session would be wrong without (deviations, blockers,
   decisions taken on the fly) — never a summary of work already visible in
   the code.
+- A **Decisions this plan assumes** section (with its **Open decisions**
+  subsection) and a **Code seams this feature touches** section, filled from
+  what you tracked in step 1 — don't leave these as empty placeholders; a
+  feature with genuinely zero assumed or open decisions is the only case
+  where a subsection is dropped, and code seams should always be populated.
 - One `## Phase N — <name>` section per phase, each with its own `- [ ]`
   steps and its own `**Notes:**` subsection (left empty until
   `/implement-step` fills it in).
@@ -93,10 +111,11 @@ instructional comments. Keep the same conventions as
 ### 4. Report back
 
 State the path of the plan file created, the number of phases/steps, and
-which steps are blocked on a decision the user needs to make (e.g. whether
-`delivered` needs its own webhook or is set manually by the
-delivery-person). Do not implement anything and do not tick any checkbox —
-that is `/implement-step`'s job.
+which steps are blocked on an **open decision** the user needs to make (e.g.
+whether `delivered` needs its own webhook or is set manually by the
+delivery-person) — list them, mirroring the plan's own **Open decisions**
+section. Do not implement anything and do not tick any checkbox — that is
+`/implement-step`'s job.
 
 ## Additional Resources
 
