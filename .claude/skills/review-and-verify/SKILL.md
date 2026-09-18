@@ -1,6 +1,7 @@
 ---
 name: review-and-verify
 description: This skill should be used when the user asks to "review this change", "check my code before commit", "run the checks and review it", "QA this", or after a code change made by /implement-step and before committing it. Runs the project's real executable checks (lint, typecheck, unit, e2e) and reports pass/fail, then reviews the diff for standards/spec compliance, missing test coverage, and future bottlenecks — delegating any missing tests to a fresh subagent instead of writing them itself.
+disallowed-tools: Bash(git commit *)
 ---
 
 # Review and Verify a Change

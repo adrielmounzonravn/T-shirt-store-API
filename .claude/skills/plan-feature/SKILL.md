@@ -1,6 +1,8 @@
 ---
 name: plan-feature
 description: This skill should be used when the user asks to "plan a feature", "write an implementation plan", "break this down into steps", "create a plan doc", or wants a checklist for a feature before any code is written — especially one of the optional features listed in docs/challenge.md's Scope section (delivery-person role, delivered status, promo codes). Produces a docs/<feature-slug>-plan.md checklist in the same format as the closed docs/week-3-plan.md and docs/week-4-plan.md.
+allowed-tools: Read Grep Glob Write(docs/*.md) Agent
+disallowed-tools: Edit NotebookEdit Bash
 ---
 
 # Plan a Feature
