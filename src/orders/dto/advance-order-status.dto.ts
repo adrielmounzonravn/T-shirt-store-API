@@ -5,6 +5,7 @@ import { OrderStatus } from '../../generated/prisma/enums.js';
 const ADVANCEABLE_STATUSES = [
   OrderStatus.processing,
   OrderStatus.shipped,
+  OrderStatus.delivered,
 ] as const;
 export type AdvanceableOrderStatus = (typeof ADVANCEABLE_STATUSES)[number];
 

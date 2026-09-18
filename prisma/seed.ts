@@ -328,10 +328,12 @@ const CATALOG: ProductSeed[] = [
 ];
 
 async function seedUsers() {
-  const [managerPassword, clientPassword] = await Promise.all([
-    bcrypt.hash('Manager123!', SALT_ROUNDS),
-    bcrypt.hash('Client123!', SALT_ROUNDS),
-  ]);
+  const [managerPassword, clientPassword, deliveryPersonPassword] =
+    await Promise.all([
+      bcrypt.hash('Manager123!', SALT_ROUNDS),
+      bcrypt.hash('Client123!', SALT_ROUNDS),
+      bcrypt.hash('Delivery123!', SALT_ROUNDS),
+    ]);
 
   await prisma.user.upsert({
     where: { email: 'manager@tshirtstore.dev' },
@@ -353,6 +355,18 @@ async function seedUsers() {
       password: clientPassword,
       fullName: 'Sample Client',
       role: 'client',
+      isVerified: true,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'delivery-person@tshirtstore.dev' },
+    update: {},
+    create: {
+      email: 'delivery-person@tshirtstore.dev',
+      password: deliveryPersonPassword,
+      fullName: 'Sample Delivery Person',
+      role: 'deliveryPerson',
       isVerified: true,
     },
   });

@@ -127,7 +127,7 @@ describe('UsersService', () => {
       expect(data.password).not.toBe(input.password);
     });
 
-    it('persists only email, hashed password, and fullName', async () => {
+    it('persists only email, hashed password, fullName, role, and isVerified', async () => {
       prisma.user.create.mockResolvedValue(userRow);
 
       await service.create(input);
@@ -137,24 +137,79 @@ describe('UsersService', () => {
         email: input.email,
         password: HASHED_PASSWORD,
         fullName: input.fullName,
+        role: Role.client,
+        isVerified: false,
       });
     });
 
-    it('does not forward a caller-supplied role, isActive, or isVerified to Prisma', async () => {
+    it('defaults isVerified to false when not provided', async () => {
+      prisma.user.create.mockResolvedValue(userRow);
+
+      await service.create(input);
+
+      const data = lastCreateData(prisma.user.create);
+      expect(data.isVerified).toBe(false);
+    });
+
+    it('forwards a caller-supplied isVerified: true to Prisma', async () => {
+      const verifiedRow = { ...userRow, isVerified: true };
+      prisma.user.create.mockResolvedValue(verifiedRow);
+
+      const result = await service.create({ ...input, isVerified: true });
+
+      const data = lastCreateData(prisma.user.create);
+      expect(data.isVerified).toBe(true);
+      expect(result.isVerified).toBe(true);
+    });
+
+    it('does not expose isActive as a settable field, even if the caller supplies one', async () => {
       prisma.user.create.mockResolvedValue(userRow);
       const maliciousInput = {
         ...input,
-        role: 'manager',
-        isActive: true,
-        isVerified: true,
-      };
+        isActive: false,
+      } as typeof input & { isActive: boolean };
 
       await service.create(maliciousInput);
 
       const data = lastCreateData(prisma.user.create);
-      expect(data).not.toHaveProperty('role');
       expect(data).not.toHaveProperty('isActive');
-      expect(data).not.toHaveProperty('isVerified');
+    });
+
+    it('always persists role as client for the sign-up path, regardless of other input properties', async () => {
+      prisma.user.create.mockResolvedValue(userRow);
+      const signupLikeInput = {
+        ...input,
+        isActive: true,
+        isVerified: true,
+      };
+
+      await service.create(signupLikeInput);
+
+      const data = lastCreateData(prisma.user.create);
+      expect(data.role).toBe(Role.client);
+    });
+
+    it('persists the caller-supplied role when input.role is set explicitly', async () => {
+      const deliveryPersonRow = { ...userRow, role: Role.deliveryPerson };
+      prisma.user.create.mockResolvedValue(deliveryPersonRow);
+
+      const result = await service.create({
+        ...input,
+        role: Role.deliveryPerson,
+      });
+
+      const data = lastCreateData(prisma.user.create);
+      expect(data.role).toBe(Role.deliveryPerson);
+      expect(result.role).toBe(Role.deliveryPerson);
+    });
+
+    it('defaults role to client when input.role is not provided', async () => {
+      prisma.user.create.mockResolvedValue(userRow);
+
+      await service.create(input);
+
+      const data = lastCreateData(prisma.user.create);
+      expect(data.role).toBe(Role.client);
     });
 
     it('resolves to a UserEntity built from the created row', async () => {

@@ -150,9 +150,23 @@ These were argued and closed. Reopen only with new information.
   fallback — not needed now.
 - **No `sku_code`.** A human-readable `RED-L-SLIM-MEN` code was considered and
   left out: purely cosmetic, nothing in the challenge needs it.
-- **Optional features are out of scope.** Delivery-person role, the `delivered`
-  status, full status history, and promo codes are not in the schema or the spec.
-  Adding any of them later means new tables plus new CASL abilities.
+- **Optional features are out of scope, except delivery-person/`delivered`.**
+  The delivery-person role and the `delivered` status are implemented
+  (`docs/delivery-person-plan.md`); full per-order status history and promo
+  codes remain out of the schema and the spec. Adding either of those later
+  still means new tables plus new CASL abilities.
+- **Delivery-person/`delivered` decisions** (`docs/delivery-person-plan.md`
+  "Decisions this plan assumes"): assignment lives on `orders.delivery_person_id`
+  (nullable FK to `users`), not a join table, since an order has at most one
+  delivery person. Assignment is its own Manager-only endpoint
+  (`PATCH /orders/{orderId}/delivery-person`), not a side effect of a status
+  advance, so it stays reversible before the order ships.
+  `processing → shipped` requires an assignee. `shipped → delivered` may only
+  be performed by the assigned delivery person, not the Manager, even though
+  the Manager keeps `read`/`update` on every order. Delivery history reuses
+  `GET /orders` (scoped to `delivery_person_id = user.sub`) rather than a new
+  `/me/deliveries` route, keeping the `/me` prefix rule intact. No new
+  notifications are sent on assignment or delivery.
 - **Mailtrap Sandbox as the real SMTP provider**, not Resend. `MailService`
   already wraps a generic `nodemailer` SMTP transport, so a plain-SMTP
   provider needs no code changes and no domain verification — unlike Resend,

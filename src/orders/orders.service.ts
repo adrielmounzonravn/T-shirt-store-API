@@ -22,10 +22,16 @@ const ALLOWED_STATUS_ADVANCES: Partial<
 > = {
   [OrderStatus.paid]: OrderStatus.processing,
   [OrderStatus.processing]: OrderStatus.shipped,
+  [OrderStatus.shipped]: OrderStatus.delivered,
 };
 
 const CANCELLABLE_STATUSES: OrderStatus[] = [
   OrderStatus.pending,
+  OrderStatus.paid,
+  OrderStatus.processing,
+];
+
+const ASSIGNABLE_STATUSES: OrderStatus[] = [
   OrderStatus.paid,
   OrderStatus.processing,
 ];
@@ -38,6 +44,7 @@ interface OrderRow {
   paymentLink: string | null;
   paymentIntent: string | null;
   totalAmount: number;
+  deliveryPersonId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,11 +60,19 @@ export class OrdersService {
     const { limit, offset, dateFrom, dateTo, status, minPrice, maxPrice } =
       query;
     const isManager = user.role === Role.manager;
+    const isDeliveryPerson = user.role === Role.deliveryPerson;
     const targetUserId = isManager ? query.userId : user.sub;
 
     const conditions: Prisma.Sql[] = [];
-    if (targetUserId) {
+    if (isDeliveryPerson) {
+      conditions.push(Prisma.sql`o.delivery_person_id = ${user.sub}::uuid`);
+    } else if (targetUserId) {
       conditions.push(Prisma.sql`cn.user_id = ${targetUserId}::uuid`);
+    }
+    if (isManager && query.deliveryPersonId) {
+      conditions.push(
+        Prisma.sql`o.delivery_person_id = ${query.deliveryPersonId}::uuid`,
+      );
     }
     if (dateFrom) {
       conditions.push(Prisma.sql`o.created_at >= ${new Date(dateFrom)}`);
@@ -94,6 +109,7 @@ export class OrdersService {
              o.status AS "status",
              o.payment_link AS "paymentLink",
              o.payment_intent AS "paymentIntent",
+             o.delivery_person_id AS "deliveryPersonId",
              o.created_at AS "createdAt",
              o.updated_at AS "updatedAt",
              COALESCE(SUM(cp.unit_price * cp.quantity), 0)::float AS "totalAmount"
@@ -131,6 +147,7 @@ export class OrdersService {
           ? PaymentMethod.payment_link
           : PaymentMethod.payment_intent,
         totalAmount: row.totalAmount,
+        deliveryPersonId: row.deliveryPersonId,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
       })),
@@ -149,13 +166,18 @@ export class OrdersService {
             },
           },
         },
+        deliveryPerson: true,
       },
     });
 
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    if (user.role !== Role.manager && order.cart.userId !== user.sub) {
+    if (user.role === Role.deliveryPerson) {
+      if (order.deliveryPersonId !== user.sub) {
+        throw new ForbiddenException('You do not have access to this order');
+      }
+    } else if (user.role !== Role.manager && order.cart.userId !== user.sub) {
       throw new ForbiddenException('You do not have access to this order');
     }
 
@@ -174,6 +196,7 @@ export class OrdersService {
           ? PaymentMethod.payment_link
           : PaymentMethod.payment_intent,
         totalAmount,
+        deliveryPersonId: order.deliveryPersonId,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
       },
@@ -189,12 +212,19 @@ export class OrdersService {
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
       })),
+      order.deliveryPerson
+        ? {
+            fullName: order.deliveryPerson.fullName,
+            email: order.deliveryPerson.email,
+          }
+        : null,
     );
   }
 
   async advanceStatus(
     orderId: string,
     status: AdvanceableOrderStatus,
+    user: JwtPayload,
   ): Promise<OrderEntity> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -208,8 +238,27 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
+    if (user.role === Role.deliveryPerson) {
+      if (order.deliveryPersonId !== user.sub) {
+        throw new ForbiddenException('You are not assigned to this order');
+      }
+      if (status !== OrderStatus.delivered) {
+        throw new ForbiddenException(
+          'Delivery person can only mark an order as delivered',
+        );
+      }
+    } else if (status === OrderStatus.delivered) {
+      throw new ForbiddenException(
+        'Only the assigned delivery person can mark an order as delivered',
+      );
+    }
     if (ALLOWED_STATUS_ADVANCES[order.status] !== status) {
       throw new UnprocessableEntityException('State transition not allowed');
+    }
+    if (status === OrderStatus.shipped && !order.deliveryPersonId) {
+      throw new UnprocessableEntityException(
+        'Order must have an assigned delivery person before it can be shipped',
+      );
     }
 
     const updated = await this.prisma.order.update({
@@ -231,6 +280,70 @@ export class OrdersService {
         ? PaymentMethod.payment_link
         : PaymentMethod.payment_intent,
       totalAmount,
+      deliveryPersonId: updated.deliveryPersonId,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+    });
+  }
+
+  async assignDeliveryPerson(
+    orderId: string,
+    deliveryPersonId: string,
+  ): Promise<OrderEntity> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        cart: {
+          include: { cartProducts: true },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    if (!ASSIGNABLE_STATUSES.includes(order.status)) {
+      throw new UnprocessableEntityException(
+        'Order must be paid or processing to assign a delivery person',
+      );
+    }
+
+    const deliveryPerson = await this.prisma.user.findUnique({
+      where: { id: deliveryPersonId },
+    });
+
+    if (!deliveryPerson) {
+      throw new NotFoundException('Delivery person not found');
+    }
+    if (
+      !deliveryPerson.isActive ||
+      deliveryPerson.role !== Role.deliveryPerson
+    ) {
+      throw new UnprocessableEntityException(
+        'User is not an active delivery person',
+      );
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { deliveryPersonId },
+    });
+
+    const totalAmount = order.cart.cartProducts.reduce(
+      (sum, item) => sum + Number(item.unitPrice) * item.quantity,
+      0,
+    );
+
+    return new OrderEntity({
+      id: updated.id,
+      cartNumber: updated.cartNumber,
+      userId: order.cart.userId,
+      status: updated.status,
+      paymentMethod: updated.paymentLink
+        ? PaymentMethod.payment_link
+        : PaymentMethod.payment_intent,
+      totalAmount,
+      deliveryPersonId: updated.deliveryPersonId,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     });
@@ -256,7 +369,9 @@ export class OrdersService {
       const reason =
         order.status === OrderStatus.cancelled
           ? 'already cancelled'
-          : 'already shipped';
+          : order.status === OrderStatus.delivered
+            ? 'already delivered'
+            : 'already shipped';
       throw new UnprocessableEntityException(
         `The order is ${reason} and cannot be cancelled`,
       );
@@ -281,6 +396,7 @@ export class OrdersService {
         ? PaymentMethod.payment_link
         : PaymentMethod.payment_intent,
       totalAmount,
+      deliveryPersonId: updated.deliveryPersonId,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     });

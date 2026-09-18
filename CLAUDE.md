@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A NestJS + Prisma + PostgreSQL T-shirt store API (capstone project, see `docs/challenge.md`). All mandatory scope from `docs/challenge.md` is implemented: auth, CASL authorization, products/SKUs/variants, image upload (S3), liked products, cart, orders (full `pending → paid → processing → shipped` / `cancelled` status flow, history with filters + pagination), Stripe checkout (Payment Links and Payment Intents) and webhook, the stock-notification job (BullMQ), the cart-expiry and reset-token cron jobs, the architecture write-up, and unit + e2e test coverage. Nothing from `docs/challenge.md`'s "Scope — optional features excluded" is in scope.
+A NestJS + Prisma + PostgreSQL T-shirt store API (capstone project, see `docs/challenge.md`). All mandatory scope from `docs/challenge.md` is implemented: auth, CASL authorization, products/SKUs/variants, image upload (S3), liked products, cart, orders (full `pending → paid → processing → shipped` / `cancelled` status flow, history with filters + pagination), Stripe checkout (Payment Links and Payment Intents) and webhook, the stock-notification job (BullMQ), the cart-expiry and reset-token cron jobs, the architecture write-up, and unit + e2e test coverage. Of `docs/challenge.md`'s "Scope — optional features excluded", the delivery-person role and `delivered` order status have since been picked up post-checkpoint (see `docs/delivery-person-plan.md`); promo codes and full per-order status history remain out of scope.
 
 **Current work is post-checkpoint improvements and changes**, not new challenge features — `docs/week-4-plan.md` is closed and stays as the record of that checkpoint, same as `docs/week-3-plan.md`.
 

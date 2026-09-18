@@ -21,6 +21,14 @@ describe('OrdersService', () => {
 
   const clientUser: JwtPayload = { sub: clientUserId, role: Role.client };
   const managerUser: JwtPayload = { sub: 'manager-1', role: Role.manager };
+  const deliveryUser: JwtPayload = {
+    sub: 'delivery-1',
+    role: Role.deliveryPerson,
+  };
+  const otherDeliveryUser: JwtPayload = {
+    sub: 'delivery-2',
+    role: Role.deliveryPerson,
+  };
 
   const baseQuery = (
     overrides: Partial<ListOrdersQueryDto> = {},
@@ -86,6 +94,56 @@ describe('OrdersService', () => {
 
       const argsString = allCallArgsAsString(prisma.$queryRaw);
       expect(argsString).toContain(otherUserId);
+    });
+
+    it('scopes a delivery person to orders assigned to them', async () => {
+      await service.findMany(baseQuery(), deliveryUser);
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(deliveryUser.sub);
+    });
+
+    it('ignores query.userId for a delivery person and scopes to their own id', async () => {
+      await service.findMany(baseQuery({ userId: otherUserId }), deliveryUser);
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(deliveryUser.sub);
+      expect(argsString).not.toContain(otherUserId);
+    });
+
+    it('scopes two different delivery persons to their own distinct id', async () => {
+      await service.findMany(baseQuery(), deliveryUser);
+      const firstArgsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(firstArgsString).toContain(deliveryUser.sub);
+      expect(firstArgsString).not.toContain(otherDeliveryUser.sub);
+
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([makeOrderRow()])
+        .mockResolvedValueOnce([{ count: 1 }]);
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      await service.findMany(baseQuery(), otherDeliveryUser);
+      const secondArgsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(secondArgsString).toContain(otherDeliveryUser.sub);
+      expect(secondArgsString).not.toContain(deliveryUser.sub);
+    });
+
+    it('ignores a query.userId matching another delivery person and does not leak it into the args', async () => {
+      await service.findMany(
+        baseQuery({ userId: otherDeliveryUser.sub }),
+        deliveryUser,
+      );
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(deliveryUser.sub);
+      expect(argsString).not.toContain(otherDeliveryUser.sub);
     });
   });
 
@@ -154,6 +212,54 @@ describe('OrdersService', () => {
 
       expect(result.data).toHaveLength(1);
       expect(result.pagination).toEqual({ limit: 20, offset: 0, total: 1 });
+    });
+  });
+
+  describe('deliveryPersonId filter', () => {
+    const deliveryPersonId = 'delivery-99';
+
+    it('scopes to the given deliveryPersonId for a manager with a deliveryPersonId filter', async () => {
+      await service.findMany(baseQuery({ deliveryPersonId }), managerUser);
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(deliveryPersonId);
+    });
+
+    it('does not scope by delivery person for a manager with no deliveryPersonId filter', async () => {
+      await service.findMany(baseQuery(), managerUser);
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).not.toContain(deliveryPersonId);
+    });
+
+    it('ignores query.deliveryPersonId for a client and scopes to the client own id', async () => {
+      await service.findMany(baseQuery({ deliveryPersonId }), clientUser);
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(clientUserId);
+      expect(argsString).not.toContain(deliveryPersonId);
+    });
+
+    it('ignores query.deliveryPersonId for a delivery person and scopes to their own assigned id', async () => {
+      await service.findMany(
+        baseQuery({ deliveryPersonId: otherDeliveryUser.sub }),
+        deliveryUser,
+      );
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(deliveryUser.sub);
+      expect(argsString).not.toContain(otherDeliveryUser.sub);
+    });
+
+    it('combines userId and deliveryPersonId filters together for a manager', async () => {
+      await service.findMany(
+        baseQuery({ userId: otherUserId, deliveryPersonId }),
+        managerUser,
+      );
+
+      const argsString = allCallArgsAsString(prisma.$queryRaw);
+      expect(argsString).toContain(otherUserId);
+      expect(argsString).toContain(deliveryPersonId);
     });
   });
 
@@ -262,6 +368,118 @@ describe('OrdersService', () => {
 
       expect(result.data).toEqual([]);
       expect(result.pagination.total).toBe(0);
+    });
+  });
+
+  describe('deliveryPersonId on findMany rows', () => {
+    it('reflects a null deliveryPersonId when the order has no assignment', async () => {
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([makeOrderRow({ deliveryPersonId: null })])
+        .mockResolvedValueOnce([{ count: 1 }]);
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      const result = await service.findMany(baseQuery(), managerUser);
+
+      expect(result.data[0].deliveryPersonId).toBeNull();
+    });
+
+    it('reflects the assigned deliveryPersonId when the order has an assignment', async () => {
+      const deliveryPersonId = 'delivery-1';
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([makeOrderRow({ deliveryPersonId })])
+        .mockResolvedValueOnce([{ count: 1 }]);
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      const result = await service.findMany(baseQuery(), managerUser);
+
+      expect(result.data[0].deliveryPersonId).toBe(deliveryPersonId);
+    });
+
+    it('keeps distinct deliveryPersonId values across rows on the same page', async () => {
+      const deliveryPersonId = 'delivery-1';
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([
+          makeOrderRow({ id: 'order-1', deliveryPersonId }),
+          makeOrderRow({ id: 'order-2', deliveryPersonId: null }),
+        ])
+        .mockResolvedValueOnce([{ count: 2 }]);
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      const result = await service.findMany(baseQuery(), managerUser);
+
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0].deliveryPersonId).toBe(deliveryPersonId);
+      expect(result.data[1].deliveryPersonId).toBeNull();
+    });
+
+    it('still applies filters correctly alongside the new deliveryPersonId field', async () => {
+      const deliveryPersonId = 'delivery-1';
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([
+          makeOrderRow({ status: OrderStatus.shipped, deliveryPersonId }),
+        ])
+        .mockResolvedValueOnce([{ count: 1 }]);
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      const result = await service.findMany(
+        baseQuery({ status: OrderStatus.shipped }),
+        managerUser,
+      );
+
+      expect(result.data[0].status).toBe(OrderStatus.shipped);
+      expect(result.data[0].deliveryPersonId).toBe(deliveryPersonId);
+    });
+
+    it('does not expose a nested delivery person object on list rows', async () => {
+      const deliveryPersonId = 'delivery-1';
+      prisma.$queryRaw = vi
+        .fn()
+        .mockResolvedValueOnce([makeOrderRow({ deliveryPersonId })])
+        .mockResolvedValueOnce([{ count: 1 }]);
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      service = moduleRef.get(OrdersService);
+
+      const result = await service.findMany(baseQuery(), managerUser);
+
+      expect(result.data[0]).not.toHaveProperty('deliveryPerson');
     });
   });
 
@@ -464,10 +682,93 @@ describe('OrdersService', () => {
       );
       expect(argsString).toContain(orderId);
     });
+
+    it('returns the order for a delivery person assigned to it', async () => {
+      const { service } = await setupFindUnique(
+        makeOrderWithCart({ deliveryPersonId: deliveryUser.sub }),
+      );
+
+      const result = await service.findOne(orderId, deliveryUser);
+
+      expect(result.orderId).toBe(orderId);
+    });
+
+    it('throws ForbiddenException when a delivery person requests an order assigned to another delivery person', async () => {
+      const { service } = await setupFindUnique(
+        makeOrderWithCart({ deliveryPersonId: otherDeliveryUser.sub }),
+      );
+
+      await expect(
+        service.findOne(orderId, deliveryUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when a delivery person requests an order with no delivery person assigned', async () => {
+      const { service } = await setupFindUnique(
+        makeOrderWithCart({ deliveryPersonId: null }),
+      );
+
+      await expect(
+        service.findOne(orderId, deliveryUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    describe('delivery person assignment', () => {
+      const deliveryPersonId = 'delivery-1';
+
+      it('returns null deliveryPersonId and no fabricated name/email when unassigned', async () => {
+        const { service } = await setupFindUnique(
+          makeOrderWithCart({ deliveryPersonId: null, deliveryPerson: null }),
+        );
+
+        const result = await service.findOne(orderId, managerUser);
+
+        expect(result.deliveryPersonId).toBeNull();
+        expect(JSON.stringify(result)).not.toContain('Dana Delivery');
+        expect(JSON.stringify(result)).not.toContain('dana@example.com');
+      });
+
+      it('does not throw when unassigned', async () => {
+        const { service } = await setupFindUnique(
+          makeOrderWithCart({ deliveryPersonId: null, deliveryPerson: null }),
+        );
+
+        await expect(
+          service.findOne(orderId, managerUser),
+        ).resolves.not.toThrow();
+      });
+
+      it('surfaces the assigned deliveryPersonId and the delivery person name/email when assigned', async () => {
+        const { service } = await setupFindUnique(
+          makeOrderWithCart({
+            deliveryPersonId,
+            deliveryPerson: {
+              id: deliveryPersonId,
+              fullName: 'Dana Delivery',
+              email: 'dana@example.com',
+            },
+          }),
+        );
+
+        const result = await service.findOne(orderId, managerUser);
+
+        expect(result.deliveryPersonId).toBe(deliveryPersonId);
+        const resultString = JSON.stringify(result);
+        expect(resultString).toContain('Dana Delivery');
+        expect(resultString).toContain('dana@example.com');
+      });
+    });
   });
 
   describe('advanceStatus', () => {
     const orderId = 'order-1';
+    const deliveryPersonId = 'delivery-1';
+    const otherDeliveryPersonId = 'delivery-2';
+
+    const deliveryUser: JwtPayload = {
+      sub: deliveryPersonId,
+      role: Role.deliveryPerson,
+    };
 
     const makeCartProduct = (overrides: Record<string, unknown> = {}) => ({
       skuId: 'sku-1',
@@ -486,6 +787,7 @@ describe('OrdersService', () => {
       status: OrderStatus.paid,
       paymentLink: 'https://buy.stripe.com/test',
       paymentIntent: null,
+      deliveryPersonId: null,
       createdAt: now,
       updatedAt: now,
       ...overrides,
@@ -524,12 +826,12 @@ describe('OrdersService', () => {
       const { service, prisma: advancePrisma } = await setupAdvance(null);
 
       await expect(
-        service.advanceStatus(orderId, OrderStatus.processing),
+        service.advanceStatus(orderId, OrderStatus.processing, managerUser),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(advancePrisma.order.update).not.toHaveBeenCalled();
     });
 
-    it('allows the paid -> processing transition and persists the new status', async () => {
+    it('allows a manager to drive paid -> processing and persists the new status', async () => {
       const updatedOrder = makeOrder({
         status: OrderStatus.processing,
         updatedAt: new Date('2024-06-02T00:00:00.000Z'),
@@ -542,29 +844,39 @@ describe('OrdersService', () => {
       const result = await service.advanceStatus(
         orderId,
         OrderStatus.processing,
+        managerUser,
       );
 
       expect(advancePrisma.order.update).toHaveBeenCalledTimes(1);
       expect(result).toEqual(
         expect.objectContaining({
           orderId,
+          cartNumber: 'cart-1',
           userId: clientUserId,
           status: OrderStatus.processing,
+          totalAmount: 51,
+          deliveryPersonId: null,
+          createdAt: now,
         }),
       );
     });
 
-    it('allows the processing -> shipped transition and persists the new status', async () => {
+    it('allows a manager to drive processing -> shipped when a delivery person is assigned', async () => {
       const updatedOrder = makeOrder({
         status: OrderStatus.shipped,
+        deliveryPersonId,
         updatedAt: new Date('2024-06-03T00:00:00.000Z'),
       });
       const { service, prisma: advancePrisma } = await setupAdvance(
-        makeOrder({ status: OrderStatus.processing }),
+        makeOrder({ status: OrderStatus.processing, deliveryPersonId }),
         updatedOrder,
       );
 
-      const result = await service.advanceStatus(orderId, OrderStatus.shipped);
+      const result = await service.advanceStatus(
+        orderId,
+        OrderStatus.shipped,
+        managerUser,
+      );
 
       expect(advancePrisma.order.update).toHaveBeenCalledTimes(1);
       expect(result).toEqual(
@@ -572,8 +884,20 @@ describe('OrdersService', () => {
           orderId,
           userId: clientUserId,
           status: OrderStatus.shipped,
+          deliveryPersonId,
         }),
       );
+    });
+
+    it('throws UnprocessableEntityException for processing -> shipped when no delivery person is assigned, and does not call update', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.processing, deliveryPersonId: null }),
+      );
+
+      await expect(
+        service.advanceStatus(orderId, OrderStatus.shipped, managerUser),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect(advancePrisma.order.update).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -582,19 +906,112 @@ describe('OrdersService', () => {
       [OrderStatus.shipped, OrderStatus.shipped],
       [OrderStatus.cancelled, OrderStatus.processing],
       [OrderStatus.processing, OrderStatus.processing],
+      [OrderStatus.pending, OrderStatus.shipped],
     ])(
       'throws UnprocessableEntityException for %s -> %s and does not call update',
       async (currentStatus, requestedStatus) => {
         const { service, prisma: advancePrisma } = await setupAdvance(
-          makeOrder({ status: currentStatus }),
+          makeOrder({ status: currentStatus, deliveryPersonId }),
         );
 
         await expect(
-          service.advanceStatus(orderId, requestedStatus),
+          service.advanceStatus(orderId, requestedStatus, managerUser),
         ).rejects.toBeInstanceOf(UnprocessableEntityException);
         expect(advancePrisma.order.update).not.toHaveBeenCalled();
       },
     );
+
+    it('throws ForbiddenException when a manager attempts shipped -> delivered', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.shipped, deliveryPersonId }),
+      );
+
+      await expect(
+        service.advanceStatus(orderId, OrderStatus.delivered, managerUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(advancePrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when a client attempts shipped -> delivered', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.shipped, deliveryPersonId }),
+      );
+
+      await expect(
+        service.advanceStatus(orderId, OrderStatus.delivered, clientUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(advancePrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the requesting delivery person is not assigned to the order (unassigned)', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.shipped, deliveryPersonId: null }),
+      );
+
+      await expect(
+        service.advanceStatus(orderId, OrderStatus.delivered, deliveryUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(advancePrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the requesting delivery person is assigned to a different order', async () => {
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({
+          status: OrderStatus.shipped,
+          deliveryPersonId: otherDeliveryPersonId,
+        }),
+      );
+
+      await expect(
+        service.advanceStatus(orderId, OrderStatus.delivered, deliveryUser),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(advancePrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it.each([[OrderStatus.processing], [OrderStatus.shipped]])(
+      'throws ForbiddenException when the assigned delivery person requests %s instead of delivered',
+      async (requestedStatus) => {
+        const { service, prisma: advancePrisma } = await setupAdvance(
+          makeOrder({ status: OrderStatus.paid, deliveryPersonId }),
+        );
+
+        await expect(
+          service.advanceStatus(orderId, requestedStatus, deliveryUser),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(advancePrisma.order.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it('allows the assigned delivery person to mark their own shipped order as delivered', async () => {
+      const updatedOrder = makeOrder({
+        status: OrderStatus.delivered,
+        deliveryPersonId,
+        updatedAt: new Date('2024-06-04T00:00:00.000Z'),
+      });
+      const { service, prisma: advancePrisma } = await setupAdvance(
+        makeOrder({ status: OrderStatus.shipped, deliveryPersonId }),
+        updatedOrder,
+      );
+
+      const result = await service.advanceStatus(
+        orderId,
+        OrderStatus.delivered,
+        deliveryUser,
+      );
+
+      expect(advancePrisma.order.update).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(
+        expect.objectContaining({
+          orderId,
+          cartNumber: 'cart-1',
+          userId: clientUserId,
+          status: OrderStatus.delivered,
+          deliveryPersonId,
+          totalAmount: 51,
+          createdAt: now,
+        }),
+      );
+    });
 
     it('computes totalAmount from unitPrice * quantity across all cart items', async () => {
       const cartProducts = [
@@ -614,6 +1031,7 @@ describe('OrdersService', () => {
       const result = await service.advanceStatus(
         orderId,
         OrderStatus.processing,
+        managerUser,
       );
 
       expect(result.totalAmount).toBe(25.5 * 2 + 10 * 3);
@@ -637,6 +1055,7 @@ describe('OrdersService', () => {
       const result = await service.advanceStatus(
         orderId,
         OrderStatus.processing,
+        managerUser,
       );
 
       expect(result.paymentMethod).toBe('payment_link');
@@ -660,6 +1079,7 @@ describe('OrdersService', () => {
       const result = await service.advanceStatus(
         orderId,
         OrderStatus.processing,
+        managerUser,
       );
 
       expect(result.paymentMethod).toBe('payment_intent');
@@ -670,7 +1090,7 @@ describe('OrdersService', () => {
         makeOrder({ status: OrderStatus.paid }),
       );
 
-      await service.advanceStatus(orderId, OrderStatus.processing);
+      await service.advanceStatus(orderId, OrderStatus.processing, managerUser);
 
       const argsString = JSON.stringify(
         advancePrisma.order.findUnique.mock.calls,
@@ -766,6 +1186,21 @@ describe('OrdersService', () => {
         expect(cancelPrisma.order.update).not.toHaveBeenCalled();
       },
     );
+
+    it('throws UnprocessableEntityException with an "already delivered" message when status is delivered, and does not call update', async () => {
+      const { service, prisma: cancelPrisma } = await setupCancel(
+        makeOrder({ status: OrderStatus.delivered }),
+      );
+
+      const promise = service.cancel(orderId, clientUser);
+
+      await expect(promise).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+      await expect(promise).rejects.toThrow('already delivered');
+      await expect(promise).rejects.not.toThrow('already shipped');
+      expect(cancelPrisma.order.update).not.toHaveBeenCalled();
+    });
 
     it.each([
       [OrderStatus.pending],
@@ -869,6 +1304,316 @@ describe('OrdersService', () => {
         cancelPrisma.order.findUnique.mock.calls,
       );
       expect(argsString).toContain(orderId);
+    });
+  });
+
+  describe('assignDeliveryPerson', () => {
+    const orderId = 'order-1';
+    const deliveryPersonId = 'delivery-1';
+
+    const makeCartProduct = (overrides: Record<string, unknown> = {}) => ({
+      skuId: 'sku-1',
+      quantity: 2,
+      unitPrice: 25.5,
+      ...overrides,
+    });
+
+    const makeOrder = (
+      overrides: Record<string, unknown> = {},
+      cartOverrides: Record<string, unknown> = {},
+      cartProducts: Record<string, unknown>[] = [makeCartProduct()],
+    ) => ({
+      id: orderId,
+      cartNumber: 'cart-1',
+      status: OrderStatus.paid,
+      paymentLink: 'https://buy.stripe.com/test',
+      paymentIntent: null,
+      deliveryPersonId: null,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+      cart: {
+        userId: clientUserId,
+        cartProducts,
+        ...cartOverrides,
+      },
+    });
+
+    const makeDeliveryUser = (overrides: Record<string, unknown> = {}) => ({
+      id: deliveryPersonId,
+      email: 'delivery@example.com',
+      password: 'hashed',
+      fullName: 'Delivery Person',
+      role: Role.deliveryPerson,
+      isActive: true,
+      isVerified: true,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    });
+
+    const setupAssign = async (
+      orderFindUniqueReturn: Record<string, unknown> | null,
+      userFindUniqueReturn: Record<string, unknown> | null,
+      updateReturn: Record<string, unknown> | null = orderFindUniqueReturn,
+    ) => {
+      const assignPrisma = {
+        order: {
+          findUnique: vi.fn().mockResolvedValue(orderFindUniqueReturn),
+          update: vi.fn().mockResolvedValue(updateReturn),
+        },
+        user: {
+          findUnique: vi.fn().mockResolvedValue(userFindUniqueReturn),
+        },
+      };
+
+      const moduleRef = await Test.createTestingModule({
+        providers: [OrdersService, PrismaService],
+      })
+        .overrideProvider(PrismaService)
+        .useValue(assignPrisma)
+        .compile();
+
+      return {
+        service: moduleRef.get(OrdersService),
+        prisma: assignPrisma,
+      };
+    };
+
+    it('throws NotFoundException when no order exists with the given id, and does not call update', async () => {
+      const { service, prisma: assignPrisma } = await setupAssign(
+        null,
+        makeDeliveryUser(),
+      );
+
+      await expect(
+        service.assignDeliveryPerson(orderId, deliveryPersonId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(assignPrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [OrderStatus.pending],
+      [OrderStatus.shipped],
+      [OrderStatus.cancelled],
+    ])(
+      'throws UnprocessableEntityException when order status is %s, and does not call update',
+      async (currentStatus) => {
+        const { service, prisma: assignPrisma } = await setupAssign(
+          makeOrder({ status: currentStatus }),
+          makeDeliveryUser(),
+        );
+
+        await expect(
+          service.assignDeliveryPerson(orderId, deliveryPersonId),
+        ).rejects.toBeInstanceOf(UnprocessableEntityException);
+        expect(assignPrisma.order.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it('throws NotFoundException when no user exists with the given deliveryPersonId, and does not call update', async () => {
+      const { service, prisma: assignPrisma } = await setupAssign(
+        makeOrder({ status: OrderStatus.paid }),
+        null,
+      );
+
+      await expect(
+        service.assignDeliveryPerson(orderId, deliveryPersonId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(assignPrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects assignment when the target user role is client, and does not call update', async () => {
+      const { service, prisma: assignPrisma } = await setupAssign(
+        makeOrder({ status: OrderStatus.paid }),
+        makeDeliveryUser({ role: Role.client }),
+      );
+
+      await expect(
+        service.assignDeliveryPerson(orderId, deliveryPersonId),
+      ).rejects.toThrow();
+      expect(assignPrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects assignment when the target user role is manager, and does not call update', async () => {
+      const { service, prisma: assignPrisma } = await setupAssign(
+        makeOrder({ status: OrderStatus.paid }),
+        makeDeliveryUser({ role: Role.manager }),
+      );
+
+      await expect(
+        service.assignDeliveryPerson(orderId, deliveryPersonId),
+      ).rejects.toThrow();
+      expect(assignPrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects assignment when the target delivery person is inactive, and does not call update', async () => {
+      const { service, prisma: assignPrisma } = await setupAssign(
+        makeOrder({ status: OrderStatus.paid }),
+        makeDeliveryUser({ isActive: false }),
+      );
+
+      await expect(
+        service.assignDeliveryPerson(orderId, deliveryPersonId),
+      ).rejects.toThrow();
+      expect(assignPrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it.each([[OrderStatus.paid], [OrderStatus.processing]])(
+      'assigns the delivery person when order status is %s and updates deliveryPersonId',
+      async (currentStatus) => {
+        const updatedOrder = makeOrder({
+          status: currentStatus,
+          deliveryPersonId,
+          updatedAt: new Date('2024-06-05T00:00:00.000Z'),
+        });
+        const { service, prisma: assignPrisma } = await setupAssign(
+          makeOrder({ status: currentStatus }),
+          makeDeliveryUser(),
+          updatedOrder,
+        );
+
+        const result = await service.assignDeliveryPerson(
+          orderId,
+          deliveryPersonId,
+        );
+
+        expect(assignPrisma.order.update).toHaveBeenCalledTimes(1);
+        expect(result).toEqual(
+          expect.objectContaining({
+            orderId,
+            cartNumber: 'cart-1',
+            userId: clientUserId,
+            status: currentStatus,
+          }),
+        );
+      },
+    );
+
+    it('computes totalAmount from unitPrice * quantity across all cart items', async () => {
+      const cartProducts = [
+        makeCartProduct({ skuId: 'sku-1', quantity: 2, unitPrice: 25.5 }),
+        makeCartProduct({ skuId: 'sku-2', quantity: 3, unitPrice: 10 }),
+      ];
+      const updatedOrder = makeOrder(
+        { status: OrderStatus.paid, deliveryPersonId },
+        {},
+        cartProducts,
+      );
+      const { service } = await setupAssign(
+        makeOrder({ status: OrderStatus.paid }, {}, cartProducts),
+        makeDeliveryUser(),
+        updatedOrder,
+      );
+
+      const result = await service.assignDeliveryPerson(
+        orderId,
+        deliveryPersonId,
+      );
+
+      expect(result.totalAmount).toBe(25.5 * 2 + 10 * 3);
+    });
+
+    it('derives payment_link when paymentLink is set', async () => {
+      const updatedOrder = makeOrder({
+        status: OrderStatus.paid,
+        deliveryPersonId,
+        paymentLink: 'https://buy.stripe.com/x',
+        paymentIntent: null,
+      });
+      const { service } = await setupAssign(
+        makeOrder({
+          status: OrderStatus.paid,
+          paymentLink: 'https://buy.stripe.com/x',
+          paymentIntent: null,
+        }),
+        makeDeliveryUser(),
+        updatedOrder,
+      );
+
+      const result = await service.assignDeliveryPerson(
+        orderId,
+        deliveryPersonId,
+      );
+
+      expect(result.paymentMethod).toBe('payment_link');
+    });
+
+    it('derives payment_intent when paymentLink is null', async () => {
+      const updatedOrder = makeOrder({
+        status: OrderStatus.paid,
+        deliveryPersonId,
+        paymentLink: null,
+        paymentIntent: 'pi_123',
+      });
+      const { service } = await setupAssign(
+        makeOrder({
+          status: OrderStatus.paid,
+          paymentLink: null,
+          paymentIntent: 'pi_123',
+        }),
+        makeDeliveryUser(),
+        updatedOrder,
+      );
+
+      const result = await service.assignDeliveryPerson(
+        orderId,
+        deliveryPersonId,
+      );
+
+      expect(result.paymentMethod).toBe('payment_intent');
+    });
+
+    it('succeeds when re-assigning the same deliveryPersonId already on the order', async () => {
+      const alreadyAssignedOrder = makeOrder({
+        status: OrderStatus.processing,
+        deliveryPersonId,
+      });
+      const { service } = await setupAssign(
+        alreadyAssignedOrder,
+        makeDeliveryUser(),
+        alreadyAssignedOrder,
+      );
+
+      const result = await service.assignDeliveryPerson(
+        orderId,
+        deliveryPersonId,
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          orderId,
+          status: OrderStatus.processing,
+        }),
+      );
+    });
+
+    it('passes the requested orderId to prisma.order.findUnique', async () => {
+      const { service, prisma: assignPrisma } = await setupAssign(
+        makeOrder({ status: OrderStatus.paid }),
+        makeDeliveryUser(),
+      );
+
+      await service.assignDeliveryPerson(orderId, deliveryPersonId);
+
+      const argsString = JSON.stringify(
+        assignPrisma.order.findUnique.mock.calls,
+      );
+      expect(argsString).toContain(orderId);
+    });
+
+    it('passes the requested deliveryPersonId to prisma.user.findUnique', async () => {
+      const { service, prisma: assignPrisma } = await setupAssign(
+        makeOrder({ status: OrderStatus.paid }),
+        makeDeliveryUser(),
+      );
+
+      await service.assignDeliveryPerson(orderId, deliveryPersonId);
+
+      const argsString = JSON.stringify(
+        assignPrisma.user.findUnique.mock.calls,
+      );
+      expect(argsString).toContain(deliveryPersonId);
     });
   });
 });
