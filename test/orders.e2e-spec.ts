@@ -38,6 +38,16 @@ describe('Orders (e2e)', () => {
     return { token: signAccessToken(testApp.app, user), userId: user.id };
   }
 
+  async function authDeliveryPerson(): Promise<{
+    token: string;
+    userId: string;
+  }> {
+    const user = await seedUser(testApp.prisma, {
+      role: Role.deliveryPerson,
+    });
+    return { token: signAccessToken(testApp.app, user), userId: user.id };
+  }
+
   async function createSellableVariant(
     overrides: { price?: number } = {},
   ): Promise<{ productId: string; skuId: string }> {
@@ -74,6 +84,7 @@ describe('Orders (e2e)', () => {
       paymentLink?: string | null;
       paymentIntent?: string | null;
       cartStatus?: 'confirmed' | 'expired';
+      deliveryPersonId?: string | null;
     } = {},
   ): Promise<string> {
     const { skuId } = await createSellableVariant();
@@ -105,6 +116,7 @@ describe('Orders (e2e)', () => {
         paymentLink:
           options.paymentLink ?? 'https://checkout.stripe.com/pay/test',
         paymentIntent: options.paymentIntent ?? null,
+        deliveryPersonId: options.deliveryPersonId ?? null,
         ...(options.createdAt ? { createdAt: options.createdAt } : {}),
       },
     });
@@ -475,8 +487,10 @@ describe('Orders (e2e)', () => {
     it('manager advances processing to shipped', async () => {
       const { token } = await authManager();
       const { userId } = await authClient();
+      const { userId: deliveryPersonId } = await authDeliveryPerson();
       const orderId = await createOrderForUser(userId, {
         status: OrderStatus.processing,
+        deliveryPersonId,
       });
 
       const response = await request(server())
@@ -487,6 +501,20 @@ describe('Orders (e2e)', () => {
 
       const body = response.body as { status: string };
       expect(body.status).toBe(OrderStatus.shipped);
+    });
+
+    it('returns 422 for processing to shipped when no delivery person is assigned', async () => {
+      const { token } = await authManager();
+      const { userId } = await authClient();
+      const orderId = await createOrderForUser(userId, {
+        status: OrderStatus.processing,
+      });
+
+      await request(server())
+        .patch(`/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: 'shipped' })
+        .expect(422);
     });
 
     it('returns 422 for an out-of-flow transition from pending', async () => {
@@ -506,8 +534,10 @@ describe('Orders (e2e)', () => {
     it('returns 422 for an out-of-flow transition when already shipped', async () => {
       const { token } = await authManager();
       const { userId } = await authClient();
+      const { userId: deliveryPersonId } = await authDeliveryPerson();
       const orderId = await createOrderForUser(userId, {
         status: OrderStatus.shipped,
+        deliveryPersonId,
       });
 
       await request(server())
@@ -541,6 +571,76 @@ describe('Orders (e2e)', () => {
         .patch(`/orders/${orderId}/status`)
         .set('Authorization', `Bearer ${token}`)
         .send({ status: 'processing' })
+        .expect(403);
+    });
+
+    it('assigned delivery person advances shipped to delivered', async () => {
+      const { userId: deliveryPersonId, token } = await authDeliveryPerson();
+      const { userId } = await authClient();
+      const orderId = await createOrderForUser(userId, {
+        status: OrderStatus.shipped,
+        deliveryPersonId,
+      });
+
+      const response = await request(server())
+        .patch(`/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: 'delivered' })
+        .expect(200);
+
+      const body = response.body as { status: string };
+      expect(body.status).toBe(OrderStatus.delivered);
+
+      const dbOrder = await testApp.prisma.order.findUniqueOrThrow({
+        where: { id: orderId },
+      });
+      expect(dbOrder.status).toBe(OrderStatus.delivered);
+    });
+
+    it('returns 403 when a manager attempts shipped to delivered', async () => {
+      const { token } = await authManager();
+      const { userId } = await authClient();
+      const { userId: deliveryPersonId } = await authDeliveryPerson();
+      const orderId = await createOrderForUser(userId, {
+        status: OrderStatus.shipped,
+        deliveryPersonId,
+      });
+
+      await request(server())
+        .patch(`/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: 'delivered' })
+        .expect(403);
+    });
+
+    it('returns 403 when the assigned delivery person attempts a transition other than shipped to delivered', async () => {
+      const { userId: deliveryPersonId, token } = await authDeliveryPerson();
+      const { userId } = await authClient();
+      const orderId = await createOrderForUser(userId, {
+        status: OrderStatus.paid,
+        deliveryPersonId,
+      });
+
+      await request(server())
+        .patch(`/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: 'processing' })
+        .expect(403);
+    });
+
+    it('returns 403 when a delivery person attempts a transition on an order not assigned to them', async () => {
+      const { token } = await authDeliveryPerson();
+      const { userId: deliveryPersonId } = await authDeliveryPerson();
+      const { userId } = await authClient();
+      const orderId = await createOrderForUser(userId, {
+        status: OrderStatus.shipped,
+        deliveryPersonId,
+      });
+
+      await request(server())
+        .patch(`/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: 'delivered' })
         .expect(403);
     });
 
@@ -637,8 +737,10 @@ describe('Orders (e2e)', () => {
 
     it('returns 422 when cancelling an already shipped order', async () => {
       const { token, userId } = await authClient();
+      const { userId: deliveryPersonId } = await authDeliveryPerson();
       const orderId = await createOrderForUser(userId, {
         status: OrderStatus.shipped,
+        deliveryPersonId,
       });
 
       await request(server())

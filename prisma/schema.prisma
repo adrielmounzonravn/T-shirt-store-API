@@ -19,6 +19,7 @@ datasource db {
 enum Role {
   manager
   client
+  deliveryPerson
 }
 
 enum Size {
@@ -61,6 +62,7 @@ enum OrderStatus {
   paid
   processing
   shipped
+  delivered
   cancelled
 }
 
@@ -81,9 +83,10 @@ model User {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  cartNumbers   CartNumber[]
-  likedProducts LikedProduct[]
-  usersAuth     UserAuth[]
+  cartNumbers    CartNumber[]
+  likedProducts  LikedProduct[]
+  usersAuth      UserAuth[]
+  deliveryOrders Order[]        @relation("OrderDeliveryPerson")
 
   @@map("users")
 }
@@ -196,16 +199,18 @@ model CartNumber {
 // cartNumber -> CartNumber.userId. paymentMethod and totalAmount are
 // computed on read, not stored (docs/db-schema.md).
 model Order {
-  id             String      @id @default(uuid()) @map("order_id") @db.Uuid
-  cartNumber     String      @unique @map("cart_number") @db.Uuid
-  idempotencyKey String      @unique @map("idempotency_key") @db.Uuid
-  paymentLink    String?     @map("payment_link")
-  paymentIntent  String?     @map("payment_intent")
-  status         OrderStatus @default(pending)
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
+  id               String      @id @default(uuid()) @map("order_id") @db.Uuid
+  cartNumber       String      @unique @map("cart_number") @db.Uuid
+  idempotencyKey   String      @unique @map("idempotency_key") @db.Uuid
+  paymentLink      String?     @map("payment_link")
+  paymentIntent    String?     @map("payment_intent")
+  status           OrderStatus @default(pending)
+  deliveryPersonId String?     @map("delivery_person_id") @db.Uuid
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
 
-  cart CartNumber @relation(fields: [cartNumber], references: [cartNumber])
+  cart           CartNumber @relation(fields: [cartNumber], references: [cartNumber])
+  deliveryPerson User?      @relation("OrderDeliveryPerson", fields: [deliveryPersonId], references: [id])
 
   @@index([status])
   @@index([createdAt])

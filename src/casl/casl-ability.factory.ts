@@ -10,9 +10,10 @@ export type Subjects =
   | 'LikedProduct'
   | 'Cart'
   | 'Order'
+  | 'User'
   | 'all';
 export type Action =
-  'manage' | 'create' | 'read' | 'update' | 'delete' | 'cancel';
+  'manage' | 'create' | 'read' | 'update' | 'delete' | 'cancel' | 'assign';
 export type AppAbility = Ability<[Action, Subjects]>;
 
 export interface AbilityUser {
@@ -27,25 +28,36 @@ export class CaslAbilityFactory {
       Ability as AbilityClass<AppAbility>,
     );
 
-    if (user.role === Role.manager) {
-      can('manage', 'Product');
-      can('manage', 'ProductVariant');
-      can('manage', 'ProductImage');
-      can('manage', 'VariantImage');
-      can('read', 'Order');
-      can('update', 'Order');
-    } else {
-      can('read', 'Product');
-      can('read', 'ProductVariant');
-      can('create', 'LikedProduct');
-      can('delete', 'LikedProduct');
-      can('read', 'Cart');
-      can('create', 'Cart');
-      can('update', 'Cart');
-      can('delete', 'Cart');
-      can('create', 'Order');
-      can('read', 'Order');
-      can('cancel', 'Order');
+    switch (user.role) {
+      case Role.manager:
+        can('manage', 'Product');
+        can('manage', 'ProductVariant');
+        can('manage', 'ProductImage');
+        can('manage', 'VariantImage');
+        can('read', 'Order');
+        can('update', 'Order');
+        can('assign', 'Order');
+        can('create', 'User');
+        break;
+      case Role.client:
+        can('read', 'Product');
+        can('read', 'ProductVariant');
+        can('create', 'LikedProduct');
+        can('delete', 'LikedProduct');
+        can('read', 'Cart');
+        can('create', 'Cart');
+        can('update', 'Cart');
+        can('delete', 'Cart');
+        can('create', 'Order');
+        can('read', 'Order');
+        can('cancel', 'Order');
+        break;
+      case Role.deliveryPerson:
+        can('read', 'Order');
+        can('update', 'Order');
+        break;
+      default:
+        break;
     }
 
     return build();

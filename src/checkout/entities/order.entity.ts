@@ -14,6 +14,7 @@ interface OrderSource {
   status: OrderStatus;
   paymentMethod: PaymentMethod;
   totalAmount: number;
+  deliveryPersonId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +39,9 @@ export class OrderEntity {
   @ApiProperty({ format: 'float' })
   totalAmount: number;
 
+  @ApiProperty({ format: 'uuid', nullable: true })
+  deliveryPersonId: string | null;
+
   @ApiProperty({ format: 'date-time' })
   createdAt: Date;
 
@@ -51,6 +55,7 @@ export class OrderEntity {
     this.status = partial.status;
     this.paymentMethod = partial.paymentMethod;
     this.totalAmount = partial.totalAmount;
+    this.deliveryPersonId = partial.deliveryPersonId ?? null;
     this.createdAt = partial.createdAt;
     this.updatedAt = partial.updatedAt;
   }

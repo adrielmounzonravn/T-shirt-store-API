@@ -4,10 +4,11 @@ info:
   description: >
     REST API for the T-shirt store. Covers authentication,
     catalog (products + variants/SKU), cart, Stripe checkout (Payment Links
-    and Payment Intents), order history with filters, likes, and stock notifications.
-    Specification consistent with the final database schema (`db-schema.md`).
-    Optional features (delivery-person role, `delivered` status, promo codes) are
-    out of scope and deliberately absent from this contract.
+    and Payment Intents), order history with filters, likes, stock notifications,
+    and delivery-person order assignment/fulfillment. Specification consistent
+    with the final database schema (`db-schema.md`). Promo codes and full
+    per-order status history remain out of scope and deliberately absent from
+    this contract.
 
 
     **Path-naming convention.** A path is prefixed with `/me` when, and only when,
@@ -28,6 +29,8 @@ servers:
 tags:
   - name: Auth
     description: Sign up, sign in, password reset, and email verification.
+  - name: Users
+    description: Manager-only account management (currently just creating delivery-person accounts).
   - name: Products
     description: Product catalog browsing and management.
   - name: Product Variants (SKU)
@@ -46,7 +49,8 @@ tags:
       user, so these operations carry no bearer auth.
   - name: Orders
     description: >
-      Order history and status. Role-polymorphic, so it lives at /orders rather
+      Order history, status, and delivery-person assignment. Role-polymorphic
+      (Client, Manager, Delivery Person), so it lives at /orders rather
       than /me/orders — see the path-naming convention below.
 
 security:
@@ -204,6 +208,39 @@ paths:
           description: Invalid, expired, or already used token
         "429":
           $ref: "#/components/responses/TooManyRequests"
+
+  # ============================================================
+  # USERS
+  # ============================================================
+  /users:
+    post:
+      tags: [Users]
+      summary: Create a delivery-person account (Manager)
+      description: >
+        The only way to create a user with a role other than client — signup
+        (POST /auth/signup) always creates a client. role must be
+        deliveryPerson.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDeliveryPersonInput"
+      responses:
+        "201":
+          description: Delivery-person account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
   # ============================================================
   # PRODUCTS
@@ -1101,11 +1138,15 @@ paths:
   /orders:
     get:
       tags: [Orders]
-      summary: List orders (own orders for Client, all orders for Manager)
+      summary: >
+        List orders (own orders for Client, assigned orders for Delivery
+        Person, all orders for Manager)
       description: >
-        Client sees only their own orders — the userId filter is ignored for
-        them. Manager sees the orders of all clients, and can narrow to a single
-        client with ?userId=, including their own id.
+        Client sees only their own orders, and Delivery Person sees only
+        orders assigned to them — the userId and deliveryPersonId filters are
+        ignored for both. Manager sees the orders of all clients, and can
+        narrow to a single client with ?userId= or to a single delivery
+        person with ?deliveryPersonId=.
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Offset"
@@ -1136,6 +1177,12 @@ paths:
         - name: userId
           in: query
           description: Manager only — filter by client
+          schema:
+            type: string
+            format: uuid
+        - name: deliveryPersonId
+          in: query
+          description: Manager only — filter by assigned delivery person
           schema:
             type: string
             format: uuid
@@ -1186,10 +1233,12 @@ paths:
       - $ref: "#/components/parameters/OrderId"
     patch:
       tags: [Orders]
-      summary: Advance order status (Manager)
+      summary: Advance order status (Manager, Delivery Person)
       description: >
-        Manager can advance paid → processing → shipped. Transitions outside the
-        allowed flow return 422.
+        Manager can advance paid → processing → shipped, but only once a
+        delivery person is assigned. The assigned delivery person can advance
+        shipped → delivered on their own order, and nothing else. Transitions
+        outside the allowed flow return 422.
       requestBody:
         required: true
         content:
@@ -1200,7 +1249,7 @@ paths:
               properties:
                 status:
                   type: string
-                  enum: [processing, shipped]
+                  enum: [processing, shipped, delivered]
       responses:
         "200":
           description: Status updated
@@ -1215,7 +1264,48 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
-          description: State transition not allowed
+          description: >
+            State transition not allowed, e.g. advancing to shipped without an
+            assigned delivery person
+
+  /orders/{orderId}/delivery-person:
+    parameters:
+      - $ref: "#/components/parameters/OrderId"
+    patch:
+      tags: [Orders]
+      summary: Assign a delivery person to an order (Manager)
+      description: >
+        Only allowed while the order is paid or processing. Reassigning to a
+        different delivery person replaces the previous assignment;
+        re-assigning the same person is idempotent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deliveryPersonId]
+              properties:
+                deliveryPersonId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Delivery person assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: >
+            The target user is not an active deliveryPerson, or the order is
+            not paid/processing
 
   /orders/{orderId}/cancel:
     parameters:
@@ -1367,7 +1457,7 @@ components:
 
     Role:
       type: string
-      enum: [manager, client]
+      enum: [manager, client, deliveryPerson]
 
     Size:
       type: string
@@ -1391,7 +1481,7 @@ components:
 
     OrderStatus:
       type: string
-      enum: [pending, paid, processing, shipped, cancelled]
+      enum: [pending, paid, processing, shipped, delivered, cancelled]
 
     CartStatus:
       type: string
@@ -1427,6 +1517,24 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    CreateDeliveryPersonInput:
+      type: object
+      required: [email, password, fullName, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        fullName:
+          type: string
+          maxLength: 120
+        role:
+          type: string
+          enum: [deliveryPerson]
 
     ProductImage:
       type: object
@@ -1707,12 +1815,29 @@ components:
           type: number
           format: float
           description: Calculated dynamically as SUM(unit_price * quantity).
+        deliveryPersonId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Assigned delivery person, if any. Set via PATCH
+            /orders/{orderId}/delivery-person; only a paid/processing order
+            can be assigned, and processing → shipped requires it.
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+
+    OrderDeliveryPerson:
+      type: object
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
 
     OrderDetail:
       allOf:
@@ -1723,3 +1848,8 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/OrderItem"
+            deliveryPerson:
+              allOf:
+                - $ref: "#/components/schemas/OrderDeliveryPerson"
+              nullable: true
+              description: Null when the order has no deliveryPersonId.

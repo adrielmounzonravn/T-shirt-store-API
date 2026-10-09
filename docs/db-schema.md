@@ -4,14 +4,16 @@ Final data model for the challenge. Together with `challenge.md` (what to build)
 `openapi.yaml` (the HTTP contract) and `implementation-notes.md` (decisions that
 belong to neither), this is everything needed to implement the API.
 
-Scope note: optional features (delivery person role, `delivered` status, promo
-codes) are deliberately out of scope and are not modelled here.
+Scope note: promo codes remain deliberately out of scope and are not modelled
+here. The delivery person role and `delivered` status are implemented — see
+`docs/implementation-notes.md` §4.
 
 ```dbml
 
 Enum Role {
   manager
   client
+  deliveryPerson
 }
 
 Enum Size {
@@ -54,6 +56,7 @@ Enum Order_Status {
   paid
   processing
   shipped
+  delivered
   cancelled
 }
 
@@ -177,6 +180,7 @@ Table orders{
   payment_link text
   payment_intent text
   status Order_Status [not null, default: 'pending']
+  delivery_person_id uuid [note: 'nullable — set only once a Manager assigns the order. FK to users, ON DELETE SET NULL']
   created_at timestamp
   updated_at timestamp
 
@@ -185,7 +189,7 @@ Table orders{
     (created_at)
   }
 
-  Note: 'The order owner is reached through cart_number -> cart_numbers.user_id; there is no user_id column here. idempotency_key stores the client-generated Idempotency-Key header (openapi.yaml IdempotencyKey component) from the POST /checkout/* call that created this order: a retried request with the same key looks up and returns this row instead of creating a new order or calling Stripe again. payment_method is derived from whichever of payment_link/payment_intent is non-null (they are mutually exclusive by construction) and exposed as Order.paymentMethod, computed on read, not stored. payment_intent stores the Stripe PaymentIntent id (pi_...), never its client_secret — the client_secret is returned once in the POST /checkout/payment-intent response for the frontend to confirm payment and is not persisted. Optional hardening: CHECK (num_nonnulls(payment_link, payment_intent) <= 1). total_amount is likewise not stored — it is SUM(unit_price * quantity) over cart_products.'
+  Note: 'The order owner is reached through cart_number -> cart_numbers.user_id; there is no user_id column here. idempotency_key stores the client-generated Idempotency-Key header (openapi.yaml IdempotencyKey component) from the POST /checkout/* call that created this order: a retried request with the same key looks up and returns this row instead of creating a new order or calling Stripe again. payment_method is derived from whichever of payment_link/payment_intent is non-null (they are mutually exclusive by construction) and exposed as Order.paymentMethod, computed on read, not stored. payment_intent stores the Stripe PaymentIntent id (pi_...), never its client_secret — the client_secret is returned once in the POST /checkout/payment-intent response for the frontend to confirm payment and is not persisted. Optional hardening: CHECK (num_nonnulls(payment_link, payment_intent) <= 1). total_amount is likewise not stored — it is SUM(unit_price * quantity) over cart_products. Partial index and CHECK constraint (manual SQL, not expressible in DBML): CREATE INDEX orders_delivery_person_id_idx ON orders(delivery_person_id) WHERE delivery_person_id IS NOT NULL — assignment is sparse; CHECK (status NOT IN (\'shipped\', \'delivered\') OR delivery_person_id IS NOT NULL) — an order cannot reach shipped or delivered without an assignee.'
 }
 
 Table liked_products {
@@ -219,6 +223,7 @@ Ref: cart_products.sku_id> product_variants.sku_id
 Ref: cart_numbers.cart_number<cart_products.cart_number
 Ref: cart_numbers.user_id> users.user_id
 Ref: orders.cart_number- cart_numbers.cart_number
+Ref: orders.delivery_person_id> users.user_id
 Ref: liked_products.user_id>users.user_id
 Ref: liked_products.product_id>products.product_id
 Ref: product_images.product_id > products.product_id
@@ -244,3 +249,21 @@ with a default, so a `NULL` can never break the comparison.
 
 **Two enums intentionally left as-is.** `Gender = kids` combined with the adult
 `Size` range (xs–xxl) is a known imprecision, accepted rather than modelled.
+
+**Delivery-person assignment.** Only a user with `role = 'deliveryPerson'`
+(and `isActive = true`) may be written to `orders.delivery_person_id` —
+enforced in `OrdersService.assignDeliveryPerson`, not by a DB-level role
+check. Assignment is only accepted while the order is `paid` or
+`processing`, and is idempotent for a re-assignment to the same person.
+
+**Delivery-person reads are scoped to their own assignments.** A user with
+`role = 'deliveryPerson'` sees only orders where
+`delivery_person_id = <their user id>` in both the order list and the order
+detail read (a delivery person requesting any other order's detail gets a
+403, not a 404) — the same `GET /orders` endpoint used by clients and
+managers, filtered per role in application code.
+
+**Who may advance to `delivered`.** Only the delivery person assigned to the
+order may transition it `shipped -> delivered`; a delivery person may not
+set any other status. The Manager keeps `read`/`update` on every order but
+gets a 403 if it tries to set `delivered` itself.

@@ -126,7 +126,7 @@ pending → paid → processing → shipped
 - Orders can be cancelled only before shipped
 - Clients can view their order's current status
 
-Note: `delivered` is not a state in this implementation — it belonged to the optional delivery-person feature, which is out of scope (see Scope below).
+Note: `delivered` was not a state when this challenge doc was written — it belonged to the optional delivery-person feature, then out of scope. Both have since been picked up post-checkpoint (see Scope below).
 
 ## Mandatory Implementations
 - Schema validation for environment variables
@@ -152,8 +152,8 @@ The following optional features were evaluated and deliberately left out. They
 are not modelled in `db-schema.md` and not specced in `openapi.yaml`; picking any
 of them up later means new tables plus new CASL abilities.
 
-- **Delivery Person role** — a third user role with assigned orders and a delivery history.
-- **`delivered` order status** — extending the flow with `shipped → delivered`, plus full per-order status history.
+- **Delivery Person role** — a third user role with assigned orders and a delivery history. *Picked up post-checkpoint; see `docs/delivery-person-plan.md`.*
+- **`delivered` order status** — extending the flow with `shipped → delivered`. *Picked up post-checkpoint alongside the Delivery Person role; full per-order status history remains out of scope (see `docs/delivery-person-plan.md` Phase 8).*
 - **Discount / promo code system** — manager-created codes (percentage or fixed, expiry, usage limit, minimum purchase), applied by the Client at checkout.
 
 ## Extra Points

@@ -3,11 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { UserEntity } from './entities/user.entity.js';
+import { Role } from '../generated/prisma/enums.js';
 
 export interface CreateUserInput {
   email: string;
   password: string;
   fullName: string;
+  role?: Role;
+  isVerified?: boolean;
 }
 
 @Injectable()
@@ -28,6 +31,8 @@ export class UsersService {
         email: input.email,
         password: hashedPassword,
         fullName: input.fullName,
+        role: input.role ?? Role.client,
+        isVerified: input.isVerified ?? false,
       },
     });
 
